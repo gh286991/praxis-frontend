@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -135,14 +136,16 @@ export default function DashboardPage() {
               {user && (
                   <>
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.picture} alt={user.name} />
-                      <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="hidden md:block">
-                      <p className="text-sm font-medium text-white">{user.name}</p>
-                      <p className="text-xs text-slate-400">{user.email}</p>
-                    </div>
+                    <Link href="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+                      <Avatar className="h-10 w-10 border border-slate-700 group-hover:border-indigo-500 transition-colors">
+                        <AvatarImage src={user.picture} alt={user.name} />
+                        <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="hidden md:block text-left">
+                        <p className="text-sm font-medium text-white group-hover:text-indigo-300 transition-colors">{user.name}</p>
+                        <p className="text-xs text-slate-400">{user.email}</p>
+                      </div>
+                    </Link>
                   </div>
                   <Button
                     variant="ghost"
