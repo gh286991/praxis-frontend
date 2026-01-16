@@ -1,38 +1,20 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowLeft, BookOpen, ChevronRight } from 'lucide-react';
 import { getSubjectBySlug, getCategoriesBySubject } from '@/lib/api';
-
-interface Subject {
-  _id: string;
-  name: string;
-  slug: string;
-  description: string;
-  language: string;
-  icon: string;
-  color: string;
-  isActive: boolean;
-}
-
-interface Category {
-  _id: string;
-  name: string;
-  slug: string;
-  description: string;
-  order: number;
-  subjectId: string;
-}
+import { useAppDispatch, useAppSelector } from '@/lib/store';
+import { setCurrentSubject, setCategories, setLoading } from '@/lib/store/slices/subjectsSlice';
 
 export default function SubjectDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const [subject, setSubject] = useState<Subject | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  
+  const { currentSubject: subject, categories, loading } = useAppSelector((state) => state.subjects);
 
   useEffect(() => {
     const token = localStorage.getItem('jwt_token');
@@ -40,19 +22,27 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
       router.push('/login');
       return;
     }
+    
+    // Set loading true initially if no subject or slug changed
+    if (!subject || subject.slug !== slug) {
+       dispatch(setLoading(true));
+    }
 
     // Fetch subject and categories
     getSubjectBySlug(slug)
       .then((subjectData) => {
-        setSubject(subjectData);
+        dispatch(setCurrentSubject(subjectData));
         return getCategoriesBySubject(subjectData._id);
       })
       .then((categoriesData) => {
-        setCategories(categoriesData);
+        dispatch(setCategories(categoriesData));
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [slug, router]);
+      .finally(() => dispatch(setLoading(false)));
+      
+    // Cleanup? Maybe clear current subject on unmount?
+    // For now, keeping it is fine, it caches the last viewed subject.
+  }, [slug, router, dispatch]);
 
   const handleStartCategory = (categorySlug: string) => {
     router.push(`/exam/${slug}/${categorySlug}`);
@@ -62,7 +52,7 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
     router.push('/dashboard');
   };
 
-  if (loading || !subject) {
+  if ((loading && !subject) || !subject) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         <div className="text-white">Loading...</div>
@@ -145,7 +135,7 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
           </div>
 
           {/* Empty State */}
-          {categories.length === 0 && (
+          {!loading && categories.length === 0 && (
             <div className="text-center py-12">
               <BookOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
               <p className="text-slate-500 text-lg">此題庫暫無類別</p>

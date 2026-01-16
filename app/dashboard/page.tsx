@@ -1,35 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BookOpen, ArrowRight, LogOut, Trophy, Target } from 'lucide-react';
 import { getSubjects } from '@/lib/api';
-
-interface UserProfile {
-  name: string;
-  email: string;
-  picture: string;
-}
-
-interface Subject {
-  _id: string;
-  name: string;
-  slug: string;
-  description: string;
-  language: string;
-  icon: string;
-  color: string;
-  isActive: boolean;
-}
+import { useAppDispatch, useAppSelector } from '@/lib/store';
+import { setUser, logout } from '@/lib/store/slices/userSlice';
+import { setSubjects, setLoading } from '@/lib/store/slices/subjectsSlice';
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  
+  const user = useAppSelector((state) => state.user.profile);
+  const { subjects, loading } = useAppSelector((state) => state.subjects);
 
   useEffect(() => {
     const token = localStorage.getItem('jwt_token');
@@ -38,28 +25,37 @@ export default function DashboardPage() {
       return;
     }
 
-    // Fetch user profile
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/users/profile`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error('Unauthorized');
-      })
-      .then((data) => setUser(data))
-      .catch(() => {
-        localStorage.removeItem('jwt_token');
-        router.push('/login');
-      });
+    // Fetch user profile if not present
+    if (!user) {
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/users/profile`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        })
+        .then((res) => {
+            if (res.ok) return res.json();
+            throw new Error('Unauthorized');
+        })
+        .then((data) => dispatch(setUser(data)))
+        .catch(() => {
+            localStorage.removeItem('jwt_token');
+            dispatch(logout());
+            router.push('/login');
+        });
+    }
 
     // Fetch subjects
+    // Optimistically assuming if we have subjects we don't need to re-fetch immediately
+    // or we can fetch to update. Let's fetch to ensure fresh data but show loading only if empty.
+    if (subjects.length === 0) {
+        dispatch(setLoading(true));
+    }
+    
     getSubjects()
-      .then((data) => setSubjects(data))
+      .then((data) => dispatch(setSubjects(data)))
       .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [router]);
+      .finally(() => dispatch(setLoading(false)));
+  }, [router, dispatch, user, subjects.length]);
 
   const handleSelectSubject = (slug: string) => {
     router.push(`/subject/${slug}`);
@@ -67,16 +63,21 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('jwt_token');
+    dispatch(logout());
     router.push('/login');
   };
 
-  if (!user || loading) {
+  if (!user && loading) { // Show loading only if no user AND loading (initial load)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         <div className="text-white">Loading...</div>
       </div>
     );
   }
+
+  // If we have user but loading subjects, we can still show skeleton or just the header
+  // For simplicity, sticking to simple check. 
+  // If user is null but not loading, it means redirect happened or error.
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -94,24 +95,28 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={user.picture} alt={user.name} />
-                  <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium text-white">{user.name}</p>
-                  <p className="text-xs text-slate-400">{user.email}</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                className="text-slate-400 hover:text-white"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
+              {user && (
+                  <>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={user.picture} alt={user.name} />
+                      <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="hidden md:block">
+                      <p className="text-sm font-medium text-white">{user.name}</p>
+                      <p className="text-xs text-slate-400">{user.email}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleLogout}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <LogOut className="h-5 w-5" />
+                  </Button>
+                  </>
+              )}
             </div>
           </div>
         </div>
@@ -123,7 +128,7 @@ export default function DashboardPage() {
           {/* Welcome Section */}
           <div className="text-center space-y-2">
             <h2 className="text-4xl font-bold text-white">
-              歡迎回來，{user.name?.split(' ')[0]}！
+              歡迎回來{user ? `，${(user.name || 'User').split(' ')[0]}` : ''}！
             </h2>
             <p className="text-slate-400 text-lg">選擇一個題庫開始練習</p>
           </div>
@@ -174,7 +179,13 @@ export default function DashboardPage() {
           </div>
 
           {/* Placeholder for inactive subjects */}
-          {subjects.filter(s => !s.isActive).length === 0 && (
+          {!loading && subjects.length === 0 && (
+             <div className="text-center py-12">
+               <p className="text-slate-500 text-lg">載入中或無可用題庫...</p>
+             </div>
+          )}
+          
+          {!loading && subjects.length > 0 && subjects.filter(s => !s.isActive).length === 0 && (
             <div className="text-center py-12">
               <Trophy className="w-16 h-16 text-slate-600 mx-auto mb-4" />
               <p className="text-slate-500 text-lg">更多題庫即將推出...</p>

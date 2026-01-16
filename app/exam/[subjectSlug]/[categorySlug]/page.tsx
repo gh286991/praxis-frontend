@@ -1,36 +1,28 @@
 'use client';
 
-import { use, useState, useEffect, useCallback } from 'react';
+import { use, useEffect, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getNextQuestion, runCode, submitAnswer, getHint, getHistory, getQuestionById } from '../../../../lib/api';
+import { useAppDispatch, useAppSelector } from '../../../../lib/store';
+import { setUser, logout } from '../../../../lib/store/slices/userSlice';
+import {
+  setCurrentQuestion,
+  setHistory,
+  setCode,
+  setOutput,
+  setLoading,
+  setExecuting,
+  setHint,
+  setIsHintOpen,
+  setIsCompleted,
+  resetQuestion,
+} from '../../../../lib/store/slices/questionsSlice';
 import Editor from '@monaco-editor/react';
 import { Play, Loader2, Sparkles, Code2, Terminal, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-
-interface Question {
-  _id: string;
-  title: string;
-  description: string;
-  sampleInput: string;
-  sampleOutput: string;
-  testCases: { input: string; output: string }[];
-}
-
-interface UserProfile {
-  name: string;
-  email: string;
-  picture: string;
-}
-
-interface HistoryItem {
-  questionId: string;
-  title: string;
-  isCorrect: boolean;
-  attemptedAt: string;
-  code?: string;
-}
+import type { HistoryItem } from '../../../../lib/store/slices/questionsSlice';
 
 const examTitles: Record<string, string> = {
   category1: '第1類：基本程式設計',
@@ -47,41 +39,44 @@ const examTitles: Record<string, string> = {
 export default function ExamPage({ params }: { params: Promise<{ subjectSlug: string; categorySlug: string }> }) {
   const { subjectSlug, categorySlug } = use(params);
   const router = useRouter();
-  const examId = categorySlug;
-  // const topic = examTopics[examId] || 'Basic Programming Design';
+  const dispatch = useAppDispatch();
   
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [question, setQuestion] = useState<Question | null>(null);
-  const [code, setCode] = useState('# write your code here\nprint("Hello World")');
-  const [output, setOutput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [executing, setExecuting] = useState(false);
+  // Redux state
+  const user = useAppSelector((state) => state.user.profile);
+  const {
+    currentQuestion: question,
+    history,
+    code,
+    output,
+    loading,
+    executing,
+    hint,
+    isHintOpen,
+    isCompleted,
+  } = useAppSelector((state) => state.questions);
+
+  const examId = categorySlug;
+  
+  // UI local state (layout related)
   const [leftWidth, setLeftWidth] = useState(480);
   const [consoleHeight, setConsoleHeight] = useState(300);
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
   const [isDraggingConsole, setIsDraggingConsole] = useState(false);
-  
-  // Hint state
-  const [hintLoading, setHintLoading] = useState(false);
-  const [hint, setHint] = useState<string | null>(null);
-  const [isHintOpen, setIsHintOpen] = useState(false);
-
-  // History state
-  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Hint loading state (UI only)
+  const [hintLoading, setHintLoading] = useState(false);
 
-  // Track if current question is completed (submitted) to avoid double submission
-  const [isCompleted, setIsCompleted] = useState(false);
-
-  const fetchHistory = useCallback(async () => {
+  const fetchHistoryData = useCallback(async () => {
     try {
       const data = await getHistory(examId);
-      setHistory(data);
+      dispatch(setHistory(data));
     } catch (e) {
       console.error('Failed to fetch history', e);
     }
-  }, [examId]);
+  }, [examId, dispatch]);
 
+  // Auth and User Profile
   useEffect(() => {
     const token = localStorage.getItem('jwt_token');
     if (!token) {
@@ -89,6 +84,8 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
       return;
     }
 
+    // Only fetch if not already loaded (or could verify token validity)
+    // For now, simple fetch content
     fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/users/profile`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -99,16 +96,22 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
         throw new Error('Unauthorized');
       })
       .then((data) => {
-        setUser(data);
-        // Fetch history after user is loaded
-        fetchHistory();
+        dispatch(setUser(data));
+        fetchHistoryData();
       })
       .catch(() => {
         localStorage.removeItem('jwt_token');
+        dispatch(logout());
         router.push('/login');
       });
-  }, [router, examId, fetchHistory]);
+      
+    // Cleanup on unmount
+    return () => {
+       dispatch(resetQuestion());
+    };
+  }, [router, dispatch, fetchHistoryData]);
 
+  // Layout resizing logic
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDraggingLeft) {
@@ -143,53 +146,46 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   }, [isDraggingLeft, isDraggingConsole]);
 
   const handleGenerate = async () => {
-    setLoading(true);
+    dispatch(setLoading(true));
     try {
       // Use examId (category) directly, forcing new question generation
       const q = await getNextQuestion(examId, true);
-      setQuestion(q);
-      setOutput('');
-      setHint(null);
-      setIsHintOpen(false);
-      setIsCompleted(false); // Reset completion status for new question
-      setCode('# write your code here\nprint("Hello World")');
+      dispatch(setCurrentQuestion(q));
+      dispatch(setOutput(''));
+      dispatch(setHint(null));
+      dispatch(setIsHintOpen(false));
+      dispatch(setIsCompleted(false));
+      dispatch(setCode('# write your code here\nprint("Hello World")'));
       
-      // Refresh history to show updated list
-      fetchHistory();
+      fetchHistoryData();
     } catch (e) {
       alert('Error generating question');
       console.error(e);
     } finally {
-      setLoading(false);
+      dispatch(setLoading(false));
     }
   };
   
   const handleSkip = async () => {
-      // Logic is merged into handleGenerate, as both "Next" and "Skip" imply moving on.
-      // If user passed, isCompleted would be true, so handleGenerate won't submit as fail.
-      // If user didn't pass, isCompleted is false, so handleGenerate will submit as fail (skip).
       await handleGenerate();
   };
 
   const handleLoadHistoryQuestion = async (item: HistoryItem) => {
-      setLoading(true);
+      dispatch(setLoading(true));
       try {
           const q = await getQuestionById(item.questionId);
-          setQuestion(q);
-          // Restore their code if available, otherwise default
-          setCode(item.code || '# write your code here\nprint("Hello World")');
-          setOutput('');
-          setHint(null);
-          setIsHintOpen(false);
-          setIsSidebarOpen(false); // Close sidebar on selection
-          setIsCompleted(true); // History questions are considered completed/view-only or re-attempt. 
-                                // If re-attempt logic is needed, we might set false, but then moving away records fail? 
-                                // For now assume viewing history doesn't auto-fail on exit.
+          dispatch(setCurrentQuestion(q));
+          dispatch(setCode(item.code || '# write your code here\nprint("Hello World")'));
+          dispatch(setOutput(''));
+          dispatch(setHint(null));
+          dispatch(setIsHintOpen(false));
+          setIsSidebarOpen(false);
+          dispatch(setIsCompleted(true));
       } catch (e) {
           console.error(e);
           alert('Failed to load question');
       } finally {
-          setLoading(false);
+          dispatch(setLoading(false));
       }
   };
   
@@ -200,8 +196,8 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     try {
       const res = await getHint(question._id, code);
       if (res.hint) {
-        setHint(res.hint);
-        setIsHintOpen(true);
+        dispatch(setHint(res.hint));
+        dispatch(setIsHintOpen(true));
       } else {
         alert('無法取得提示');
       }
@@ -223,15 +219,15 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   };
 
   const executeCode = async (input: string, expectedOutput?: string) => {
-    setExecuting(true);
+    dispatch(setExecuting(true));
     try {
       const res = await runCode(code, input);
       if (res.error) {
-        setOutput(`❌ Error:\n${res.error}`);
+        dispatch(setOutput(`❌ Error:\n${res.error}`));
         // Record failed attempt (error)
         if (question) {
              await submitAnswer(question._id, code, false, examId);
-             fetchHistory(); // Refresh history
+             fetchHistoryData();
         }
       } else {
         const actual = res.output.trim();
@@ -249,25 +245,20 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
             }
         }
         
-        setOutput(resultMsg);
+        dispatch(setOutput(resultMsg));
 
         // Record attempt
         if (question) {
             await submitAnswer(question._id, code, isCorrect, examId);
-            fetchHistory(); // Refresh history
-            setIsCompleted(true); // Mark as completed so we don't auto-fail on next
+            fetchHistoryData();
+            dispatch(setIsCompleted(true));
         }
       }
     } catch (e) {
-      setOutput('❌ Execution failed');
+      dispatch(setOutput('❌ Execution failed'));
       console.error(e);
-      // Logic for execution failure:
-      // If execution fails (syntax error etc), we might want to record it as fail too?
-      // Currently catch block sets output but doesn't submit. 
-      // User says "skip... record". Running and failing syntax is an attempt?
-      // Let's leave catch block as is (no submission), so if they skip after syntax error, it records as fail (via handleGenerate logic).
     } finally {
-      setExecuting(false);
+      dispatch(setExecuting(false));
     }
   };
 
@@ -333,7 +324,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
         </div>
       </div>
 
-      {/* Main Content - No longer needs margin */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="relative px-6 py-4 bg-gradient-to-r from-slate-900/90 via-slate-800/90 to-slate-900/90 backdrop-blur-xl border-b border-slate-700/50 shadow-2xl flex-shrink-0 z-40">
@@ -363,7 +354,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 via-cyan-300 to-indigo-300 bg-clip-text text-transparent">
                     {examTitles[examId] || 'TQC Python'}
                 </h1>
-                <p className="text-xs text-slate-400 font-medium">持續練習模式</p>
+                <p className="text-xs text-slate-400 font-medium">持續練習模式 ({isCompleted ? '已完成' : '進行中'})</p>
                 </div>
             </div>
             <div className="flex items-center gap-3">
@@ -481,7 +472,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                             AI 學習提示
                         </div>
                         <button 
-                            onClick={() => setIsHintOpen(false)}
+                            onClick={() => dispatch(setIsHintOpen(false))}
                             className="text-slate-400 hover:text-white hover:bg-slate-800 p-1 rounded-lg transition-colors"
                         >
                             <X className="w-5 h-5" />
@@ -552,7 +543,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                     </div>
                     <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex justify-end">
                         <Button 
-                            onClick={() => setIsHintOpen(false)}
+                            onClick={() => dispatch(setIsHintOpen(false))}
                             className="bg-slate-800 hover:bg-slate-700 text-white"
                         >
                             了解
@@ -586,7 +577,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 defaultLanguage="python"
                 theme="vs-dark"
                 value={code}
-                onChange={(value) => setCode(value || '')}
+                onChange={(value) => dispatch(setCode(value || ''))}
                 options={{
                     minimap: { enabled: false },
                     fontSize: 15,
