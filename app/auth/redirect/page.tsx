@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function AuthRedirectPage() {
+function RedirectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -17,9 +17,15 @@ export default function AuthRedirectPage() {
     }
   }, [router, searchParams]);
 
+  return <p>Redirecting...</p>;
+}
+
+export default function AuthRedirectPage() {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p>Redirecting...</p>
+      <Suspense fallback={<p>Loading...</p>}>
+        <RedirectContent />
+      </Suspense>
     </div>
   );
 }
