@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,14 +9,15 @@ import { BookOpen, ArrowRight, LogOut, Trophy, Target } from 'lucide-react';
 import { getSubjects } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setUser, logout } from '@/lib/store/slices/userSlice';
-import { setSubjects, setLoading } from '@/lib/store/slices/subjectsSlice';
+import { setSubjects, setLoading, fetchAllStats } from '@/lib/store/slices/subjectsSlice';
+import { ProgressStats } from '@/components/ProgressStats';
 
 export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   
   const user = useAppSelector((state) => state.user.profile);
-  const { subjects, loading } = useAppSelector((state) => state.subjects);
+  const { subjects, loading, stats } = useAppSelector((state) => state.subjects);
 
   useEffect(() => {
     const token = localStorage.getItem('jwt_token');
@@ -45,8 +46,6 @@ export default function DashboardPage() {
     }
 
     // Fetch subjects
-    // Optimistically assuming if we have subjects we don't need to re-fetch immediately
-    // or we can fetch to update. Let's fetch to ensure fresh data but show loading only if empty.
     if (subjects.length === 0) {
         dispatch(setLoading(true));
     }
@@ -55,7 +54,43 @@ export default function DashboardPage() {
       .then((data) => dispatch(setSubjects(data)))
       .catch(console.error)
       .finally(() => dispatch(setLoading(false)));
+
+    // Fetch stats
+    dispatch(fetchAllStats());
+
   }, [router, dispatch, user, subjects.length]);
+
+  const overallStats = useMemo(() => {
+    if (!stats || stats.length === 0) return null;
+    
+    const initial = {
+      totalQuestions: 0,
+      completedQuestions: 0,
+      passedQuestions: 0,
+      failedQuestions: 0,
+      completionRate: 0,
+      passRate: 0
+    };
+
+    const aggregated = stats.reduce((acc, curr) => ({
+      totalQuestions: acc.totalQuestions + curr.totalQuestions,
+      completedQuestions: acc.completedQuestions + curr.completedQuestions,
+      passedQuestions: acc.passedQuestions + curr.passedQuestions,
+      failedQuestions: acc.failedQuestions + curr.failedQuestions,
+      completionRate: 0,
+      passRate: 0,
+    }), initial);
+
+    // Recalculate rates
+    aggregated.completionRate = aggregated.totalQuestions > 0 
+      ? (aggregated.completedQuestions / aggregated.totalQuestions) * 100 
+      : 0;
+    aggregated.passRate = aggregated.completedQuestions > 0 
+      ? (aggregated.passedQuestions / aggregated.completedQuestions) * 100 
+      : 0;
+
+    return aggregated;
+  }, [stats]);
 
   const handleSelectSubject = (slug: string) => {
     router.push(`/subject/${slug}`);
@@ -86,12 +121,14 @@ export default function DashboardPage() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-2 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-xl">
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="Praxis Logo" 
+                className="w-10 h-10 rounded-xl"
+              />
               <div>
-                <h1 className="text-xl font-bold text-white">TQC 題庫練習</h1>
-                <p className="text-xs text-slate-400">多語言程式設計平台</p>
+                <h1 className="text-xl font-bold text-white">Praxis</h1>
+                <p className="text-xs text-slate-400">AI 程式測驗平台</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -132,6 +169,13 @@ export default function DashboardPage() {
             </h2>
             <p className="text-slate-400 text-lg">選擇一個題庫開始練習</p>
           </div>
+          
+          {/* Overall Stats */}
+          {overallStats && (overallStats.completedQuestions > 0) && (
+             <div className="max-w-4xl mx-auto">
+                <ProgressStats stats={overallStats} title="總體學習概況" />
+             </div>
+          )}
 
           {/* Subject Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

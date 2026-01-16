@@ -17,7 +17,9 @@ import {
   setIsCompleted,
   resetQuestion,
 } from '../../../../lib/store/slices/questionsSlice';
-import Editor from '@monaco-editor/react';
+import { QuestionPanel } from '../../../../components/exam/QuestionPanel';
+import { EditorPanel } from '../../../../components/exam/EditorPanel';
+import { ConsolePanel } from '../../../../components/exam/ConsolePanel';
 import { Play, Loader2, Sparkles, Code2, Terminal, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -352,7 +354,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 </div>
                 <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 via-cyan-300 to-indigo-300 bg-clip-text text-transparent">
-                    {examTitles[examId] || 'TQC Python'}
+                    {examTitles[examId] || 'Praxis'}
                 </h1>
                 <p className="text-xs text-slate-400 font-medium">持續練習模式 ({isCompleted ? '已完成' : '進行中'})</p>
                 </div>
@@ -404,51 +406,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
             className="flex flex-col border-r border-slate-700/50 bg-gradient-to-b from-slate-900/50 to-slate-900/30 backdrop-blur-sm"
             style={{ width: `${leftWidth}px`, minWidth: '320px', maxWidth: '800px' }}
             >
-            {question ? (
-                <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                <div className="space-y-4">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 border border-indigo-500/30 rounded-full">
-                    <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                    <span className="text-xs font-bold tracking-wider text-indigo-300 uppercase">題目</span>
-                    </div>
-                    <h2 className="text-3xl font-bold text-white leading-tight tracking-tight">{question.title}</h2>
-                    <div className="prose prose-invert prose-slate max-w-none">
-                    <p className="text-slate-300 text-base leading-relaxed whitespace-pre-wrap">{question.description}</p>
-                    </div>
-                </div>
-                
-                <div className="space-y-4">
-                    <div className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl hover:shadow-2xl hover:shadow-cyan-900/10 transition-all duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="relative px-5 py-3 bg-gradient-to-r from-slate-800/80 to-slate-900/80 border-b border-slate-700/50 flex justify-between items-center">
-                        <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">範例輸入</h3>
-                    </div>
-                    <pre className="relative p-5 font-mono text-sm text-cyan-200 overflow-x-auto">
-                        {question.sampleInput || <span className="text-slate-600 italic">無需輸入</span>}
-                    </pre>
-                    </div>
-
-                    <div className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl hover:shadow-2xl hover:shadow-emerald-900/10 transition-all duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="relative px-5 py-3 bg-gradient-to-r from-slate-800/80 to-slate-900/80 border-b border-slate-700/50 flex justify-between items-center">
-                        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">範例輸出</h3>
-                    </div>
-                    <pre className="relative p-5 font-mono text-sm text-emerald-200 overflow-x-auto">{question.sampleOutput}</pre>
-                    </div>
-                </div>
-                </div>
-            ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                <div className="relative mb-8">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-3xl blur-2xl opacity-20 animate-pulse" />
-                    <div className="relative w-24 h-24 bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl flex items-center justify-center border border-slate-700 shadow-2xl">
-                    <Sparkles className="w-12 h-12 text-indigo-400" />
-                    </div>
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-3">開始練習</h3>
-                <p className="text-slate-400 max-w-sm leading-relaxed text-sm">點擊上方「開始練習」按鈕開始 TQC Python 題目。</p>
-                </div>
-            )}
+              <QuestionPanel question={question} loading={loading} />
             </div>
 
             {/* Resizable Divider (Horizontal) */}
@@ -553,48 +511,12 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 </div>
             )}
 
-            {/* Editor Toolbar */}
-            <div className="px-6 py-3 bg-gradient-to-r from-slate-900/95 to-slate-800/95 backdrop-blur-sm border-b border-slate-700/50 flex justify-between items-center shadow-lg flex-shrink-0">
-                <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-500 shadow-lg shadow-cyan-500/50" />
-                <span className="text-sm font-bold text-white tracking-wide">solution.py</span>
-                </div>
-                <button
-                onClick={handleRun}
-                disabled={executing}
-                className="relative overflow-hidden group flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-lg shadow-xl shadow-emerald-900/30 transition-all font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
-                >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                {executing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-                執行程式碼
-                </button>
-            </div>
-
-            {/* Editor */}
-            <div className="flex-1 relative min-h-0 overflow-hidden">
-                <Editor
-                height="100%"
-                defaultLanguage="python"
-                theme="vs-dark"
-                value={code}
-                onChange={(value) => dispatch(setCode(value || ''))}
-                options={{
-                    minimap: { enabled: false },
-                    fontSize: 15,
-                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-                    fontWeight: '500',
-                    padding: { top: 20, bottom: 20 },
-                    scrollBeyondLastLine: false,
-                    lineNumbers: "on",
-                    renderLineHighlight: "all",
-                    smoothScrolling: true,
-                    cursorBlinking: "smooth",
-                    cursorSmoothCaretAnimation: "on",
-                    lineHeight: 24,
-                    letterSpacing: 0.5
-                }}
-                />
-            </div>
+            <EditorPanel 
+              code={code}
+              onChange={(val) => dispatch(setCode(val || ''))}
+              onRun={handleRun}
+              isExecuting={executing}
+            />
             
             {/* Resizable Divider (Vertical) */}
             <div
@@ -605,23 +527,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 <div className="h-1 w-16 bg-slate-700 group-hover:bg-white rounded-full transition-colors" />
             </div>
             
-            {/* Console Output */}
-            <div 
-                className="bg-gradient-to-b from-black to-slate-950 border-t border-slate-700/50 flex flex-col shadow-2xl flex-shrink-0"
-                style={{ height: `${consoleHeight}px` }}
-            >
-                <div className="px-5 py-3 bg-gradient-to-r from-slate-900/90 to-slate-800/90 backdrop-blur-sm border-b border-slate-700/50 flex items-center gap-3">
-                <Terminal className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm font-bold text-white uppercase tracking-wider">執行結果</span>
-                <div className="flex-1" />
-                <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500/80 shadow-lg shadow-emerald-500/50" />
-                </div>
-                </div>
-                <pre className="flex-1 p-6 font-mono text-[15px] overflow-auto text-emerald-300 font-semibold leading-relaxed selection:bg-emerald-900/30 tracking-wide">
-                {output || <span className="text-slate-600 italic font-normal">等待執行...</span>}
-                </pre>
-            </div>
+            <ConsolePanel output={output} height={consoleHeight} />
             </div>
         </main>
       </div>
