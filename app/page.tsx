@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { generateQuestion, runCode } from '../lib/api';
+import { getNextQuestion, runCode } from '../lib/api';
 import Editor from '@monaco-editor/react';
 import { Play, Loader2, Sparkles, Code2, Terminal } from 'lucide-react';
 
@@ -58,10 +58,24 @@ export default function Home() {
     };
   }, [isDraggingLeft, isDraggingConsole]);
 
+  // Map topic names to category IDs
+  const topicToCategory: Record<string, string> = {
+    'Basic Programming Design': 'category1',
+    'Selection Statements': 'category2',
+    'Repetition Structures': 'category3',
+    'Complex Data Structures': 'category4',
+    'Functions': 'category5',
+    'List Comprehension and String Operations': 'category6',
+    'Error Handling and Files': 'category7', // Note: Check mapping
+    'Standard Libraries and Modules': 'category8',
+    'Object-Oriented Programming': 'category9',
+  };
+
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const q = await generateQuestion(topic);
+      const categoryId = topicToCategory[topic] || 'category1';
+      const q = await getNextQuestion(categoryId);
       setQuestion(q);
       setOutput('');
     } catch (e) {
