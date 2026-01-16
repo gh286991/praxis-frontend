@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { BookOpen, Clock, Trophy, User, LogOut } from 'lucide-react';
+import { BookOpen, ArrowRight, LogOut, Trophy, Target } from 'lucide-react';
+import { getSubjects } from '@/lib/api';
 
 interface UserProfile {
   name: string;
@@ -13,112 +14,21 @@ interface UserProfile {
   picture: string;
 }
 
-interface ExamType {
-  id: string;
-  title: string;
+interface Subject {
+  _id: string;
+  name: string;
+  slug: string;
   description: string;
-  level: number;
-  questionCount: number;
-  timeLimit: number;
-  icon: React.ReactNode;
+  language: string;
+  icon: string;
   color: string;
+  isActive: boolean;
 }
-
-const examTypes: ExamType[] = [
-  {
-    id: 'category1',
-    title: '第1類：基本程式設計',
-    description: '程式語言基本概念、輸入輸出',
-    level: 1,
-    questionCount: 10,
-    timeLimit: 30,
-    icon: <BookOpen className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-blue-500 to-blue-600',
-  },
-  {
-    id: 'category2',
-    title: '第2類：選擇敘述',
-    description: 'if/elif/else 條件判斷',
-    level: 1,
-    questionCount: 10,
-    timeLimit: 30,
-    icon: <BookOpen className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-cyan-500 to-cyan-600',
-  },
-  {
-    id: 'category3',
-    title: '第3類：迴圈敘述',
-    description: 'for/while 迴圈',
-    level: 1,
-    questionCount: 10,
-    timeLimit: 30,
-    icon: <BookOpen className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-teal-500 to-teal-600',
-  },
-  {
-    id: 'category4',
-    title: '第4類：進階控制流程',
-    description: 'break、continue、巢狀結構',
-    level: 2,
-    questionCount: 8,
-    timeLimit: 35,
-    icon: <Trophy className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-green-500 to-green-600',
-  },
-  {
-    id: 'category5',
-    title: '第5類：函式(Function)',
-    description: '函式定義、參數、回傳值',
-    level: 2,
-    questionCount: 8,
-    timeLimit: 35,
-    icon: <Trophy className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-emerald-500 to-emerald-600',
-  },
-  {
-    id: 'category6',
-    title: '第6類：串列(List)的運作',
-    description: '一維、二維串列操作',
-    level: 2,
-    questionCount: 8,
-    timeLimit: 35,
-    icon: <Trophy className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-lime-500 to-lime-600',
-  },
-  {
-    id: 'category7',
-    title: '第7類：數組、集合、字典',
-    description: 'Tuple、Set、Dict 運作',
-    level: 2,
-    questionCount: 8,
-    timeLimit: 40,
-    icon: <Trophy className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-amber-500 to-amber-600',
-  },
-  {
-    id: 'category8',
-    title: '第8類：字串(String)的運作',
-    description: '字串處理與操作',
-    level: 2,
-    questionCount: 8,
-    timeLimit: 35,
-    icon: <Trophy className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-orange-500 to-orange-600',
-  },
-  {
-    id: 'category9',
-    title: '第9類：檔案與異常處理',
-    description: '檔案讀寫、例外處理',
-    level: 3,
-    questionCount: 6,
-    timeLimit: 40,
-    icon: <Trophy className="w-6 h-6" />,
-    color: 'bg-gradient-to-br from-red-500 to-red-600',
-  },
-];
 
 export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -128,6 +38,7 @@ export default function DashboardPage() {
       return;
     }
 
+    // Fetch user profile
     fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/users/profile`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -142,11 +53,16 @@ export default function DashboardPage() {
         localStorage.removeItem('jwt_token');
         router.push('/login');
       });
+
+    // Fetch subjects
+    getSubjects()
+      .then((data) => setSubjects(data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [router]);
 
-  const handleStartExam = (examId: string) => {
-    // TODO: Navigate to exam page
-    router.push(`/exam/${examId}`);
+  const handleSelectSubject = (slug: string) => {
+    router.push(`/subject/${slug}`);
   };
 
   const handleLogout = () => {
@@ -154,7 +70,7 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  if (!user) {
+  if (!user || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         <div className="text-white">Loading...</div>
@@ -173,8 +89,8 @@ export default function DashboardPage() {
                 <BookOpen className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">TQC Python</h1>
-                <p className="text-xs text-slate-400">考試準備平台</p>
+                <h1 className="text-xl font-bold text-white">TQC 題庫練習</h1>
+                <p className="text-xs text-slate-400">多語言程式設計平台</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -209,94 +125,61 @@ export default function DashboardPage() {
             <h2 className="text-4xl font-bold text-white">
               歡迎回來，{user.name?.split(' ')[0]}！
             </h2>
-            <p className="text-slate-400 text-lg">選擇一個考試類型開始練習</p>
+            <p className="text-slate-400 text-lg">選擇一個題庫開始練習</p>
           </div>
 
-          {/* Exam Cards */}
+          {/* Subject Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {examTypes.map((exam) => (
+            {subjects.map((subject) => (
               <Card
-                key={exam.id}
-                className="bg-slate-800/50 border-slate-700/50 hover:border-slate-600 transition-all hover:shadow-xl hover:shadow-indigo-900/20"
+                key={subject._id}
+                className="bg-slate-800/50 border-slate-700/50 hover:border-slate-600 transition-all hover:shadow-xl hover:shadow-indigo-900/20 cursor-pointer group"
+                onClick={() => handleSelectSubject(subject.slug)}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className={`${exam.color} p-3 rounded-xl shadow-lg`}>
-                      {exam.icon}
+                    <div 
+                      className="p-4 rounded-xl shadow-lg text-4xl"
+                      style={{ background: subject.color }}
+                    >
+                      {subject.icon}
                     </div>
-                    <div className="px-3 py-1 bg-slate-700/50 rounded-full">
-                      <span className="text-xs font-bold text-slate-300">Level {exam.level}</span>
-                    </div>
+                    {subject.isActive && (
+                      <div className="px-3 py-1 bg-green-500/20 rounded-full border border-green-500/30">
+                        <span className="text-xs font-bold text-green-400">啟用中</span>
+                      </div>
+                    )}
                   </div>
-                  <CardTitle className="text-white mt-4">{exam.title}</CardTitle>
+                  <CardTitle className="text-white mt-4 group-hover:text-cyan-400 transition">
+                    {subject.name}
+                  </CardTitle>
                   <CardDescription className="text-slate-400">
-                    {exam.description}
+                    {subject.description}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <BookOpen className="w-4 h-4 text-indigo-400" />
-                      <span>{exam.questionCount} 題</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <Clock className="w-4 h-4 text-cyan-400" />
-                      <span>{exam.timeLimit} 分鐘</span>
+                      <Target className="w-4 h-4 text-indigo-400" />
+                      <span className="capitalize">{subject.language}</span>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleStartExam(exam.id)}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500"
-                  >
-                    開始考試
+                  <Button className="w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 group">
+                    查看題目
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition" />
                   </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-            <Card className="bg-slate-800/30 border-slate-700/50">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-green-500/20 rounded-xl">
-                    <Trophy className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">0</p>
-                    <p className="text-sm text-slate-400">已完成考試</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-slate-800/30 border-slate-700/50">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-500/20 rounded-xl">
-                    <BookOpen className="w-6 h-6 text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">0</p>
-                    <p className="text-sm text-slate-400">答對題數</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-slate-800/30 border-slate-700/50">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-purple-500/20 rounded-xl">
-                    <User className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">-</p>
-                    <p className="text-sm text-slate-400">平均分數</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Placeholder for inactive subjects */}
+          {subjects.filter(s => !s.isActive).length === 0 && (
+            <div className="text-center py-12">
+              <Trophy className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-500 text-lg">更多題庫即將推出...</p>
+            </div>
+          )}
         </div>
       </main>
     </div>

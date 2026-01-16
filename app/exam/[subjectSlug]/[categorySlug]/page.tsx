@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { getNextQuestion, runCode, submitAnswer, getHint, getHistory, getQuestionById } from '../../../lib/api';
+import { use, useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { getNextQuestion, runCode, submitAnswer, getHint, getHistory, getQuestionById } from '../../../../lib/api';
 import Editor from '@monaco-editor/react';
 import { Play, Loader2, Sparkles, Code2, Terminal, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { cn } from '@/lib/utils'; // Assuming this utility exists, if not I will use inline template literals or clsx directly
+import { cn } from '@/lib/utils';
 
 interface Question {
-  _id: string; // Add ID for submission
+  _id: string;
   title: string;
   description: string;
   sampleInput: string;
@@ -44,10 +44,10 @@ const examTitles: Record<string, string> = {
   category9: '第9類：檔案與異常處理',
 };
 
-export default function ExamPage() {
-  const params = useParams();
+export default function ExamPage({ params }: { params: Promise<{ subjectSlug: string; categorySlug: string }> }) {
+  const { subjectSlug, categorySlug } = use(params);
   const router = useRouter();
-  const examId = params.id as string;
+  const examId = categorySlug;
   // const topic = examTopics[examId] || 'Basic Programming Design';
   
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -351,10 +351,10 @@ export default function ExamPage() {
                 <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push(`/subject/${subjectSlug}`)}
                 className="text-slate-400 hover:text-white"
                 >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-5 w-5" />
                 </Button>
                 <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-xl shadow-lg shadow-indigo-500/20">
                 <Code2 className="w-6 h-6 text-white" />

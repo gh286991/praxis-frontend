@@ -56,4 +56,36 @@ export const getQuestionById = async (id: string) => {
   return response.data;
 };
 
+// Multi-subject API functions
+export const getSubjects = async () => {
+  const response = await api.get('/subjects');
+  return response.data;
+};
+
+export const getSubjectBySlug = async (slug: string) => {
+  const response = await api.get(`/subjects/${slug}`);
+  return response.data;
+};
+
+export const getCategoriesBySubject = async (subjectId: string) => {
+  const response = await api.get(`/categories/subject/${subjectId}`);
+  return response.data;
+};
+
+export const getAllStats = async () => {
+  const token = localStorage.getItem('jwt_token');
+  const response = await api.get('/stats', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getSubjectStats = async (slug: string) => {
+  const token = localStorage.getItem('jwt_token');
+  const response = await api.get(`/stats/subject/${slug}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
 export default api;
