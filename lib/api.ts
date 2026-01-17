@@ -29,6 +29,17 @@ export const runCode = async (code: string, input: string) => {
   return response.data;
 };
 
+export const evaluateSubmission = async (questionId: string, code: string) => {
+  const token = localStorage.getItem('jwt_token');
+  const response = await api.post('/execution/submit', {
+    questionId,
+    code,
+  }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
 export const getHint = async (questionId: string, code: string) => {
   const token = localStorage.getItem('jwt_token');
   const response = await api.post('/questions/hint', {

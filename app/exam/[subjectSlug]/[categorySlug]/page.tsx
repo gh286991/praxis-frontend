@@ -3,7 +3,7 @@
 import { use, useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getNextQuestion, runCode, submitAnswer, getHint, getHistory, getQuestionById } from '@/lib/api';
+import { getNextQuestion, runCode, submitAnswer, getHint, getHistory, getQuestionById, evaluateSubmission } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setUser, logout } from '@/lib/store/slices/userSlice';
 import {
@@ -17,11 +17,13 @@ import {
   setIsHintOpen,
   setIsCompleted,
   resetQuestion,
+  setSubmissionLoading,
+  setSubmissionResult,
 } from '@/lib/store/slices/questionsSlice';
 import { QuestionPanel } from '@/components/exam/QuestionPanel';
 import { EditorPanel } from '@/components/exam/EditorPanel';
 import { ConsolePanel } from '@/components/exam/ConsolePanel';
-import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal } from 'lucide-react';
+import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { HistoryItem } from '@/lib/store/slices/questionsSlice';
@@ -56,6 +58,8 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     hint,
     isHintOpen,
     isCompleted,
+    submissionLoading,
+    submissionResult,
   } = useAppSelector((state) => state.questions);
 
   const examId = categorySlug;
@@ -242,11 +246,6 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
       const res = await runCode(code, input);
       if (res.error) {
         dispatch(setOutput(`❌ Error:\n${res.error}`));
-        // Record failed attempt (error)
-        if (question) {
-             await submitAnswer(question._id, code, false, examId);
-             fetchHistoryData();
-        }
       } else {
         const actual = res.output.trim();
         const expected = expectedOutput ? expectedOutput.trim() : null;
@@ -254,29 +253,53 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
         let resultMsg = actual;
         let isCorrect = false;
         
-        if (expected !== null) {
-            if (actual === expected) {
-                resultMsg = `✅ Correct!\n\nOutput:\n${actual}`;
-                isCorrect = true;
-            } else {
-                resultMsg = `❌ Incorrect.\n\nExpected:\n${expected}\n\nActual:\n${actual}`;
-            }
+        if (actual === expected) {
+            resultMsg = `✅ Correct!\n\nOutput:\n${actual}`;
+            isCorrect = true;
+        } else {
+            resultMsg = `❌ Incorrect.\n\nExpected:\n${expected}\n\nActual:\n${actual}`;
         }
-        
-        dispatch(setOutput(resultMsg));
 
-        // Record attempt
-        if (question) {
-            await submitAnswer(question._id, code, isCorrect, examId);
-            fetchHistoryData();
-            dispatch(setIsCompleted(true));
-        }
+    
+    dispatch(setOutput(resultMsg));
+    
+    // NOTE: We do NOT record attempts on "Run" anymore. Only on "Submit".
+    }
+  } catch (e) {
+  dispatch(setOutput('❌ Execution failed'));
+  console.error(e);
+} finally {
+      dispatch(setExecuting(false));
+    }
+  };
+
+
+
+  const handleSubmit = async () => {
+    if (!question) return;
+    
+    dispatch(setSubmissionLoading(true));
+    try {
+      const res = await evaluateSubmission(question._id, code);
+      dispatch(setSubmissionResult(res));
+      
+      // Only record completion if the submission is correct
+      if (res.isCorrect) {
+          await submitAnswer(question._id, code, true, examId);
+          fetchHistoryData();
+          dispatch(setIsCompleted(true));
+      } else {
+          // Optional: Record failed attempt too if desired?
+          // User request: "Completion/Success should have submit success to count".
+          // Usually we record fails too for history.
+          await submitAnswer(question._id, code, false, examId);
+          fetchHistoryData();
       }
     } catch (e) {
-      dispatch(setOutput('❌ Execution failed'));
       console.error(e);
+      alert('提交失敗 (Submission Failed)');
     } finally {
-      dispatch(setExecuting(false));
+      dispatch(setSubmissionLoading(false));
     }
   };
 
@@ -405,6 +428,15 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                     >
                     {hintLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lightbulb className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />}
                     AI HINT
+                    </button>
+
+                    <button
+                    onClick={handleSubmit}
+                    disabled={submissionLoading || !question}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/50 rounded-lg transition-all font-bold text-xs text-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed group"
+                    >
+                    {submissionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />}
+                    SUBMIT
                     </button>
 
                     {question && (
@@ -554,6 +586,133 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                         </div>
                     </div>
                 </div>
+                </div>
+            )}
+
+            {/* Submission Result Modal */}
+            {submissionResult && (
+                <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-slate-900 border border-slate-700/50 rounded-lg shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                            <div className="flex items-center gap-3">
+                                {submissionResult.isCorrect ? (
+                                    <div className="p-2 bg-emerald-500/10 rounded-full">
+                                        <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                                    </div>
+                                ) : (
+                                    <div className="p-2 bg-rose-500/10 rounded-full">
+                                        <XCircle className="w-6 h-6 text-rose-400" />
+                                    </div>
+                                )}
+                                <div>
+                                    <h2 className="text-xl font-bold text-white tracking-tight">
+                                        {submissionResult.isCorrect ? 'CHALLENGE COMPLETED' : 'SUBMISSION FAILED'}
+                                    </h2>
+                                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">
+                                        Evaluation Report
+                                    </p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => dispatch(setSubmissionResult(null))}
+                                className="text-slate-500 hover:text-white hover:bg-slate-800 p-2 rounded-full transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-0 overflow-y-auto custom-scrollbar flex-1">
+                             {/* AI Feedback Section */}
+                             <div className="p-6 border-b border-slate-800 bg-slate-800/20">
+                                <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4" />
+                                    AI Security & Logic Analysis
+                                </h3>
+                                <div className={`p-4 rounded-lg border ${submissionResult.semanticResult.passed ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+                                    <div className="flex items-start gap-3">
+                                        {submissionResult.semanticResult.passed ? (
+                                            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                                        ) : (
+                                            <Lightbulb className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                                        )}
+                                        <div>
+                                            <p className={`font-bold text-sm mb-1 ${submissionResult.semanticResult.passed ? 'text-emerald-300' : 'text-amber-300'}`}>
+                                                {submissionResult.semanticResult.passed ? 'Logic Verified' : 'Logic Recommendations'}
+                                            </p>
+                                            <p className="text-slate-300 text-sm leading-relaxed">
+                                                {submissionResult.semanticResult.feedback}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                             </div>
+
+                             {/* Test Cases Section */}
+                             <div className="p-6">
+                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Code2 className="w-4 h-4" />
+                                    Test Case Execution
+                                </h3>
+                                <div className="space-y-3">
+                                    {submissionResult.testResult.results.map((result: any, index: number) => (
+                                        <div key={index} className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden">
+                                            <div className={`px-4 py-2 flex items-center justify-between border-b border-slate-800 ${result.passed ? 'bg-emerald-500/5' : 'bg-rose-500/5'}`}>
+                                                <span className="font-mono text-xs text-slate-400 uppercase">Test Case #{index + 1}</span>
+                                                {result.passed ? (
+                                                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                                        <CheckCircle2 className="w-3 h-3" /> PASS
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1.5 text-xs font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                                                        <XCircle className="w-3 h-3" /> FAIL
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="p-4 grid grid-cols-2 gap-4 text-xs font-mono">
+                                                <div>
+                                                    <div className="text-slate-500 mb-1">Input:</div>
+                                                    <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre-wrap">{result.input}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-slate-500 mb-1">Expected:</div>
+                                                    <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre-wrap">{result.expected}</div>
+                                                </div>
+                                                {!result.passed && (
+                                                    <div className="col-span-2">
+                                                        <div className="text-rose-400/80 mb-1">Actual Output:</div>
+                                                        <div className="bg-rose-950/10 p-2 rounded text-rose-300 border border-rose-500/20 overflow-x-auto whitespace-pre-wrap">
+                                                            {result.error ? `Error: ${result.error}` : result.actual}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+                        </div>
+                        
+                        <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+                            <Button 
+                                variant="outline" 
+                                onClick={() => dispatch(setSubmissionResult(null))}
+                                className="border-slate-700 hover:bg-slate-800 text-slate-300"
+                            >
+                                Close Report
+                            </Button>
+                            {submissionResult.isCorrect && (
+                                <Button 
+                                    onClick={() => {
+                                        dispatch(setSubmissionResult(null));
+                                        handleGenerate(); // Next question
+                                    }}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                                >
+                                    Next Challenge <SkipForward className="w-4 h-4 ml-2" />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 

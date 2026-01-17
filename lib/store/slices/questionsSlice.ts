@@ -27,6 +27,12 @@ interface QuestionsState {
   hint: string | null;
   isHintOpen: boolean;
   isCompleted: boolean;
+  submissionLoading: boolean;
+  submissionResult: {
+    isCorrect: boolean;
+    testResult: { passed: boolean; results: any[] };
+    semanticResult: { passed: boolean; feedback: string };
+  } | null;
 }
 
 const initialState: QuestionsState = {
@@ -39,6 +45,8 @@ const initialState: QuestionsState = {
   hint: null,
   isHintOpen: false,
   isCompleted: false,
+  submissionLoading: false,
+  submissionResult: null,
 };
 
 const questionsSlice = createSlice({
@@ -79,6 +87,14 @@ const questionsSlice = createSlice({
       state.hint = null;
       state.isHintOpen = false;
       state.isCompleted = false;
+      state.submissionResult = null;
+      state.submissionLoading = false;
+    },
+    setSubmissionLoading: (state, action: PayloadAction<boolean>) => {
+      state.submissionLoading = action.payload;
+    },
+    setSubmissionResult: (state, action: PayloadAction<any>) => {
+      state.submissionResult = action.payload;
     },
   },
 });
@@ -94,6 +110,8 @@ export const {
   setIsHintOpen,
   setIsCompleted,
   resetQuestion,
+  setSubmissionLoading,
+  setSubmissionResult,
 } = questionsSlice.actions;
 
 export default questionsSlice.reducer;
