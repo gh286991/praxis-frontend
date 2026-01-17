@@ -10,7 +10,7 @@ import { ChevronLeft, Cpu, Shield, Activity, Share2, Clock } from 'lucide-react'
 import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { TerminalWindow } from '@/components/TerminalWindow';
 import { Footer } from '@/components/landing/Footer';
-import { DashboardNavbar } from '@/components/DashboardNavbar';
+import { AppNavbar } from '@/components/AppNavbar';
 
 interface SubjectStat {
   subjectTitle: string;
@@ -23,11 +23,13 @@ export default function ProfilePage() {
   const router = useRouter();
   const { profile: user, isAuthenticated } = useAppSelector((state) => state.user);
   const [stats, setStats] = useState<SubjectStat[]>([]);
+  const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadStats();
+      loadProfile();
     } else {
         setLoading(false);
     }
@@ -39,6 +41,20 @@ export default function ProfilePage() {
       setStats(data);
     } catch (error) {
       console.error('Failed to load stats:', error);
+    }
+  };
+
+  const loadProfile = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api'}/users/profile`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('jwt_token')}`,
+        },
+      });
+      const data = await response.json();
+      setProfileData(data);
+    } catch (error) {
+      console.error('Failed to load profile:', error);
     } finally {
       setLoading(false);
     }
@@ -48,13 +64,14 @@ export default function ProfilePage() {
     if (window.history.length > 2) {
       router.back();
     } else {
-      router.push('/dashboard');
+      router.push('/courses');
     }
   };
 
   // Calculate aggregates with proper fallbacks
-  const totalAttempts = stats.reduce((acc, curr) => acc + (curr.totalAttempts || 0), 0);
-  const totalPassed = stats.reduce((acc, curr) => acc + (curr.passedCount || 0), 0);
+  // Use profile data if available, otherwise calculate from stats
+  const totalAttempts = profileData?.totalQuestionsCompleted || stats.reduce((acc, curr) => acc + (curr.totalAttempts || 0), 0);
+  const totalPassed = profileData?.totalQuestionsPassed || stats.reduce((acc, curr) => acc + (curr.passedCount || 0), 0);
   const overallPassRate = totalAttempts > 0 ? Math.round((totalPassed / totalAttempts) * 100) : 0;
 
   if (!isAuthenticated && !loading) {
@@ -77,7 +94,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-mono selection:bg-indigo-500/30 relative overflow-hidden flex flex-col">
       <CyberpunkBackground />
       
-      <DashboardNavbar />
+      <AppNavbar />
 
       <main className="flex-1 p-4 md:p-8 relative z-10 overflow-y-auto">
         <div className="max-w-6xl mx-auto space-y-6">
@@ -228,7 +245,7 @@ export default function ProfilePage() {
                             ) : (
                                 <div className="text-center py-12 border border-dashed border-slate-800 rounded">
                                     <div className="text-slate-600 mb-2">NO DATA MODULES FOUND</div>
-                                    <Link href="/dashboard" className="text-xs text-cyan-500 hover:text-cyan-400 uppercase tracking-widest">
+                                    <Link href="/courses" className="text-xs text-cyan-500 hover:text-cyan-400 uppercase tracking-widest">
                                         [ INITIATE_FIRST_EXERCISE ]
                                     </Link>
                                 </div>

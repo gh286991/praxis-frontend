@@ -9,7 +9,7 @@ import { setCurrentSubject, setCategories, setLoading, fetchSubjectStats } from 
 import { Footer } from '@/components/landing/Footer';
 import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { TerminalWindow } from '@/components/TerminalWindow';
-import { DashboardNavbar } from '@/components/DashboardNavbar';
+import { AppNavbar } from '@/components/AppNavbar';
 
 export default function SubjectDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -82,7 +82,7 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
     <div className="min-h-screen bg-slate-950 text-slate-100 font-mono selection:bg-indigo-500/30 relative overflow-hidden flex flex-col">
         <CyberpunkBackground />
 
-        <DashboardNavbar />
+        <AppNavbar />
 
       {/* Main Content */}
       <main className="relative container mx-auto px-6 py-12 z-20 flex-1">

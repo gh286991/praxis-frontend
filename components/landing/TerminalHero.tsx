@@ -171,7 +171,7 @@ export function TerminalHero() {
         const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
         if (token) {
           setTerminalLines((prev) => [...prev, '> 正在載入儀表板...']);
-          setTimeout(() => router.push('/dashboard'), 800);
+          setTimeout(() => router.push('/courses'), 800);
         } else {
           setTerminalLines((prev) => [
             ...prev,
@@ -200,7 +200,7 @@ export function TerminalHero() {
         setTerminalLines((prev) => [
           ...prev,
           `drwxr-xr-x  ${userName}  praxis  4096  exercises`,
-          `drwxr-xr-x  ${userName}  praxis  4096  dashboard`,
+          `drwxr-xr-x  ${userName}  praxis  4096  courses`,
           `drwxr-xr-x  ${userName}  praxis  4096  settings`,
           `-rw-r--r--  ${userName}  praxis   512  README.md`,
           ''

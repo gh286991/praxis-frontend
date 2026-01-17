@@ -51,7 +51,7 @@ export default function LoginPage() {
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem('jwt_token', data.access_token);
-        router.push('/dashboard');
+        router.push('/courses');
       } else {
         alert('Login failed');
       }

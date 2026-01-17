@@ -7,7 +7,7 @@ import { LogOut } from 'lucide-react';
 import { useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 
-export function DashboardNavbar() {
+export function AppNavbar() {
   const router = useRouter();
   const user = useAppSelector((state) => state.user.profile);
 
@@ -21,7 +21,7 @@ export function DashboardNavbar() {
     <header className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-4 group">
+          <Link href="/courses" className="flex items-center gap-4 group">
             <div className="relative w-10 h-10">
               <div className="absolute inset-0 bg-indigo-500 blur-lg opacity-20 group-hover:opacity-40 transition-opacity" />
               {/* Logo Placeholder - replaced img with a CSS-only version if image not available, or keep img if stable */}
@@ -34,7 +34,7 @@ export function DashboardNavbar() {
                 PRAXIS
               </h1>
               <p className="text-[10px] text-slate-400 tracking-widest uppercase">
-                Dashboard Module
+                課程中心
               </p>
             </div>
           </Link>

@@ -12,9 +12,9 @@ import { setSubjects, setLoading, fetchAllStats } from '@/lib/store/slices/subje
 import { ProgressStats } from '@/components/ProgressStats';
 import { Footer } from '@/components/landing/Footer';
 import { CyberpunkBackground } from '@/components/CyberpunkBackground'; // Import Footer
-import { DashboardNavbar } from '@/components/DashboardNavbar';
+import { AppNavbar } from '@/components/AppNavbar';
 
-export default function DashboardPage() {
+export default function CoursesPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   
@@ -102,7 +102,7 @@ export default function DashboardPage() {
   if (!user && loading) { // Show loading only if no user AND loading (initial load)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 font-mono">
-        <div className="text-indigo-400 animate-pulse">Initializing Dashboard...</div>
+        <div className="text-indigo-400 animate-pulse">正在載入課程...</div>
       </div>
     );
   }
@@ -111,7 +111,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-950 text-slate-200 font-mono relative flex flex-col selection:bg-indigo-500/30">
       <CyberpunkBackground />
       
-      <DashboardNavbar />
+      <AppNavbar />
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12 relative z-20 flex-1">
@@ -143,18 +143,11 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          {/* Overall Stats */}
-          {overallStats && (overallStats.completedQuestions > 0) && (
-             <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <ProgressStats stats={overallStats} title="總體學習數據" />
-             </div>
-          )}
-
           {/* Subject Cards */}
           <div>
               <div className="flex items-center gap-2 mb-6">
                   <LayoutDashboard className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-lg font-bold text-slate-200 tracking-wider">訓練模組列表</h3>
+                  <h3 className="text-lg font-bold text-slate-200 tracking-wider">課程列表</h3>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
