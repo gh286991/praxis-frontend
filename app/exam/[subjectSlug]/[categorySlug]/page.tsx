@@ -3,7 +3,7 @@
 import { use, useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getNextQuestion, runCode, submitAnswer, getHint, getHistory, getQuestionById, evaluateSubmission } from '@/lib/api';
+import { getNextQuestion, submitAnswer, getHint, getHistory, getQuestionById, evaluateSubmission } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setUser, logout } from '@/lib/store/slices/userSlice';
 import {
@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { HistoryItem } from '@/lib/store/slices/questionsSlice';
 import { CyberpunkBackground } from '@/components/CyberpunkBackground';
+import { usePyodide } from '@/hooks/usePyodide';
 
 const examTitles: Record<string, string> = {
   category1: '第1類：基本程式設計',
@@ -62,6 +63,21 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     submissionResult,
   } = useAppSelector((state) => state.questions);
 
+  // Pyodide Integration
+  const { 
+    runCode: runPyodide, 
+    runCodeWithOutput,
+    output: pyodideOutput, 
+    isLoading: isPyodideLoading 
+  } = usePyodide();
+
+  // Sync Pyodide output to Redux for display
+  useEffect(() => {
+    if (pyodideOutput.length > 0) {
+      dispatch(setOutput(pyodideOutput.join('\n')));
+    }
+  }, [pyodideOutput, dispatch]);
+
   const examId = categorySlug;
   
   // UI local state (layout related)
@@ -75,6 +91,9 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   // Hint loading state (UI only)
   const [hintLoading, setHintLoading] = useState(false);
 
+  // Result state
+  const [isPassed, setIsPassed] = useState<boolean | undefined>(undefined);
+
   const fetchHistoryData = useCallback(async () => {
     try {
       const data = await getHistory(examId);
@@ -83,6 +102,81 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
       console.error('Failed to fetch history', e);
     }
   }, [examId, dispatch]);
+
+  // ... (inside handleRun)
+  const handleRun = async () => {
+    dispatch(setExecuting(true));
+    dispatch(setOutput('Initializing execution environment...'));
+    setIsPassed(undefined); // Reset status
+
+    try {
+      if (isPyodideLoading) {
+        dispatch(setOutput('Environment initializing... please wait.'));
+        return;
+      }
+
+      const inputToUse = question?.sampleInput || '';
+      dispatch(setOutput('Running code...'));
+      
+      // Execute once with sample input
+      const { output: actualOutput, error } = await runCodeWithOutput(code, inputToUse);
+      
+      // Calculate Pass/Fail
+      if (question?.sampleOutput) {
+          const actualTrimmed = actualOutput.trim();
+          const expectedTrimmed = question.sampleOutput.trim();
+          setIsPassed(!error && actualTrimmed === expectedTrimmed);
+      }
+      
+      // Output is handled by runCodeWithOutput return, we need to dispatch it 
+      // OR let the useEffect handle it if we used the standard runPyodide.
+      // But runCodeWithOutput returns output and doesn't update state automatically? 
+      // Wait, looking at usePyodide implementation earlier:
+      // "Restore default handlers to update React state ... setOutput((prev) => [...prev, msg])"
+      // So the useEffect WILL pick it up. 
+      // However, runCodeWithOutput ALSO returns it. To be safe/consistent with previous revert:
+      // The previous revert used runPyodide(code).
+      // If I use runCodeWithOutput, I need to make sure I don't double print or miss print.
+      
+      // To keep it simple and consistent with "Execute once", let's use runCodeWithOutput 
+      // because we NEED the return value to compare, which runPyodide (void) doesn't give easily without race conditions.
+      
+      // But wait, the previous step's revert used:
+      // await runPyodide(code, inputToUse);
+      // And relied on useEffect syncing output.
+      
+      // OPTION 1: Use runCodeWithOutput, but manually dispatch setOutput?
+      // The hook implementation I wrote:
+      // finally { restore default handlers } 
+      // It DOES NOT automatically put the *captured* output into the global SetOutput state during execution?
+      // Actually, the hook implementation:
+      // pyodide.setStdout({ batched: (msg) => localOutput.push(msg) });
+      // It captures locally. It does NOT update global state during run.
+      // So if I switch to runCodeWithOutput, I must dispatch setOutput manually after.
+      
+      if (actualOutput) {
+         dispatch(setOutput(actualOutput));
+      } else if (error) {
+         dispatch(setOutput(`Error: ${error}`));
+      }
+
+    } catch (e) {
+      console.error(e);
+      dispatch(setOutput('Execution failed due to an internal error.'));
+    } finally {
+      dispatch(setExecuting(false));
+    }
+  };
+
+  // ...
+
+            <ConsolePanel 
+              output={output} 
+              height={consoleHeight} 
+              input={question?.sampleInput}
+              expectedOutput={question?.sampleOutput}
+              passed={isPassed}
+            />
 
   // Auth and User Profile
   useEffect(() => {
@@ -231,47 +325,9 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     }
   };
 
-  const handleRun = async () => {
-    if (!question) {
-        executeCode('');
-        return;
-    }
-    
-    executeCode(question.sampleInput, question.sampleOutput);
-  };
 
-  const executeCode = async (input: string, expectedOutput?: string) => {
-    dispatch(setExecuting(true));
-    try {
-      const res = await runCode(code, input);
-      if (res.error) {
-        dispatch(setOutput(`❌ Error:\n${res.error}`));
-      } else {
-        const actual = res.output.trim();
-        const expected = expectedOutput ? expectedOutput.trim() : null;
-        
-        let resultMsg = actual;
-        let isCorrect = false;
-        
-        if (actual === expected) {
-            resultMsg = `✅ Correct!\n\nOutput:\n${actual}`;
-            isCorrect = true;
-        } else {
-            resultMsg = `❌ Incorrect.\n\nExpected:\n${expected}\n\nActual:\n${actual}`;
-        }
 
-    
-    dispatch(setOutput(resultMsg));
-    
-    // NOTE: We do NOT record attempts on "Run" anymore. Only on "Submit".
-    }
-  } catch (e) {
-  dispatch(setOutput('❌ Execution failed'));
-  console.error(e);
-} finally {
-      dispatch(setExecuting(false));
-    }
-  };
+
 
 
 
@@ -732,10 +788,17 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 <GripHorizontal className="h-4 w-4 text-slate-700 group-hover:text-indigo-400 transition-colors" />
             </div>
             
-            <ConsolePanel output={output} height={consoleHeight} />
+            <ConsolePanel 
+              output={output} 
+              height={consoleHeight} 
+              input={question?.sampleInput}
+              expectedOutput={question?.sampleOutput}
+              passed={isPassed}
+            />
             </div>
         </main>
       </div>
     </div>
   );
 }
+
