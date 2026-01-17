@@ -5,21 +5,23 @@ RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Copy root workspace files
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
 # Copy frontend package file
 COPY frontend/package.json ./frontend/
 
-# Install dependencies for workspace (including frontend)
-RUN pnpm install --filter frontend...
+# Base stage
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
-# Copy source code
-COPY frontend ./frontend
-
-# Build the application
-WORKDIR /app/frontend
-ENV NEXT_TELEMETRY_DISABLED=1
+# Builder stage
+FROM base AS builder
+WORKDIR /app
+COPY package.json pnpm-lock.yaml* ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile || pnpm install
+COPY . .
 RUN pnpm build
 
 # Production stage
@@ -34,11 +36,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm install -g pnpm
 
 # Copy public folder
-COPY --from=builder /app/frontend/public ./frontend/public
+COPY --from=builder /app/public ./public
 
 # Copy built assets
-COPY --from=builder /app/frontend/.next/standalone ./
-COPY --from=builder /app/frontend/.next/static ./frontend/.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 # Expose port
 EXPOSE 3000
@@ -46,4 +48,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "frontend/server.js"]
+CMD ["node", "server.js"]
