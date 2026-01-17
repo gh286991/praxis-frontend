@@ -1,107 +1,22 @@
-import axios from 'axios';
+/**
+ * API Module - Main Entry Point
+ * 
+ * This file re-exports everything from lib/api/index.ts
+ * 
+ * Usage:
+ * 
+ * Old way (still works):
+ * import { getNextQuestion, runCode } from '@/lib/api';
+ * 
+ * New way (recommended):
+ * import { questionsApi, executionApi } from '@/lib/api';
+ * await questionsApi.getNext('category1');
+ * await executionApi.run(code, input);
+ */
 
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api',
-});
+// Re-export everything from the api/index.ts
+export * from './api/index';
 
-export const getNextQuestion = async (category: string, force: boolean = false) => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.get(`/questions/next/${category}?force=${force}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
+// Also export the apiClient if needed directly
+export { default as apiClient } from './apiClient';
 
-export const submitAnswer = async (questionId: string, code: string, isCorrect: boolean, category: string) => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.post(`/questions/${questionId}/submit`, {
-    code,
-    isCorrect,
-    category
-  }, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
-
-export const runCode = async (code: string, input: string) => {
-  const response = await api.post('/execution/run', { code, input });
-  return response.data;
-};
-
-export const evaluateSubmission = async (questionId: string, code: string) => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.post('/execution/submit', {
-    questionId,
-    code,
-  }, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
-
-export const getHint = async (questionId: string, code: string) => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.post('/questions/hint', {
-    questionId,
-    code,
-  }, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
-
-export const getHistory = async (category: string) => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.get(`/questions/history/${category}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
-
-export const getQuestionById = async (id: string) => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.get(`/questions/${id}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
-
-// Multi-subject API functions
-export const getSubjects = async () => {
-  const response = await api.get('/subjects');
-  return response.data;
-};
-
-export const getSubjectBySlug = async (slug: string) => {
-  const response = await api.get(`/subjects/${slug}`);
-  return response.data;
-};
-
-export const getCategoriesBySubject = async (subjectId: string) => {
-  const response = await api.get(`/categories/subject/${subjectId}`);
-  return response.data;
-};
-
-export const getAllStats = async () => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.get('/stats', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
-
-export const getSubjectStats = async (slug: string) => {
-  const token = localStorage.getItem('jwt_token');
-  const response = await api.get(`/stats/subject/${slug}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
-};
-
-export const getPlatformStats = async () => {
-  const response = await api.get('/stats/platform');
-  return response.data;
-};
-
-export default api;
