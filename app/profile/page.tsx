@@ -6,7 +6,7 @@ import { useAppSelector } from '@/lib/store';
 import { getAllStats } from '@/lib/api';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ChevronLeft, Cpu, Shield, Activity, Share2, Clock } from 'lucide-react';
+import { Cpu, Shield, Activity, Share2, Clock } from 'lucide-react';
 import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { TerminalWindow } from '@/components/TerminalWindow';
 import { Footer } from '@/components/landing/Footer';
@@ -60,14 +60,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleBack = () => {
-    if (window.history.length > 2) {
-      router.back();
-    } else {
-      router.push('/courses');
-    }
-  };
-
   // Calculate aggregates with proper fallbacks
   // Use profile data if available, otherwise calculate from stats
   const totalAttempts = profileData?.totalQuestionsCompleted || stats.reduce((acc, curr) => acc + (curr.totalAttempts || 0), 0);
@@ -98,18 +90,6 @@ export default function ProfilePage() {
 
       <main className="flex-1 p-4 md:p-8 relative z-10 overflow-y-auto">
         <div className="max-w-6xl mx-auto space-y-6">
-            
-            {/* Breadcrumb / Back Navigation */}
-            <div className="flex items-center gap-2">
-                <button 
-                  onClick={handleBack}
-                  className="group flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors"
-                >
-                    <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-xs font-bold tracking-widest uppercase">[ RETURN_PREVIOUS ]</span>
-                </button>
-            </div>
-
             <TerminalWindow title="USER_PROFILE_DATABASE // V.2.4.1">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
                     

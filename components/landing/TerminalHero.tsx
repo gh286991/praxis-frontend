@@ -65,7 +65,15 @@ const ABOUT_TEXT = [
   '',
 ];
 
-export function TerminalHero() {
+interface TerminalHeroProps {
+  initialStats?: {
+    activeLearners: number;
+    totalQuestions: number;
+    totalExecutions: number;
+  };
+}
+
+export function TerminalHero({ initialStats }: TerminalHeroProps) {
   const router = useRouter();
   const user = useAppSelector((state) => state.user);
   const userName = user.profile?.name || (user.isAuthenticated ? 'user' : 'username');
@@ -78,20 +86,23 @@ export function TerminalHero() {
   const [isWelcomeComplete, setIsWelcomeComplete] = useState(false);
   // System Monitor State
   const [aiLatency, setAiLatency] = useState(45);
-  const [activeUsers, setActiveUsers] = useState(0); // Start at 0, fetch real data
-  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(initialStats?.activeLearners || 0); 
+  const [totalQuestions, setTotalQuestions] = useState(initialStats?.totalQuestions || 0);
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
 
   // Ensure client-side only rendering to prevent hydration mismatch
   useEffect(() => {
     setIsMounted(true);
-    // Fetch real platform stats
-    getPlatformStats().then(stats => {
-      setActiveUsers(stats.activeLearners);
-      setTotalQuestions(stats.totalQuestions);
-    }).catch(err => console.error('Failed to fetch platform stats:', err));
-  }, []);
+    
+    // Only fetch if we didn't get initial stats (or maybe we want to refresh? let's stick to initial if present)
+    if (!initialStats) {
+      getPlatformStats().then(stats => {
+        setActiveUsers(stats.activeLearners);
+        setTotalQuestions(stats.totalQuestions);
+      }).catch(err => console.error('Failed to fetch platform stats:', err));
+    }
+  }, [initialStats]);
 
   // Simulator Effect (Only for Latency now)
   useEffect(() => {

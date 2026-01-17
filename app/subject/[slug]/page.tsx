@@ -2,7 +2,7 @@
 
 import { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, BarChart2, BookOpen, Shield, Cpu, Activity } from 'lucide-react';
+import { BarChart2, BookOpen, Shield, Cpu, Activity } from 'lucide-react';
 import { getSubjectBySlug, getCategoriesBySubject } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setCurrentSubject, setCategories, setLoading, fetchSubjectStats } from '@/lib/store/slices/subjectsSlice';
@@ -57,9 +57,6 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
     router.push(`/exam/${slug}/${categorySlug}`);
   };
 
-  const handleBack = () => {
-    router.back();
-  };
 
   if ((loading && !subject) || !subject) {
     return (
@@ -87,17 +84,6 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
       {/* Main Content */}
       <main className="relative container mx-auto px-6 py-12 z-20 flex-1">
         <div className="max-w-7xl mx-auto space-y-8">
-            {/* Breadcrumb / Back Navigation */}
-           <div className="flex items-center gap-2">
-                <button 
-                onClick={handleBack}
-                className="group flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors"
-                >
-                    <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-xs font-bold tracking-widest uppercase">[ RETURN_PREVIOUS ]</span>
-                </button>
-            </div>
-
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6"> 
                     
                     {/* Header / Info Panel */}

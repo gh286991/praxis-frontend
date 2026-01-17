@@ -53,12 +53,24 @@ export function AppNavbar() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">
-                      <p className="text-xs font-bold text-indigo-300 group-hover:text-indigo-200 transition-colors uppercase tracking-wider">
-                        {user.name}
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-mono">
-                        Authorized User
-                      </p>
+                      <Link
+                          href="/courses"
+                          className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                      >
+                          COURSES
+                      </Link>
+                      <Link
+                          href="/subscription"
+                          className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                      >
+                          SUBSCRIPTION
+                      </Link>
+                      <Link
+                          href="/profile"
+                          className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                      >
+                          PROFILE
+                      </Link>
                     </div>
                   </Link>
                 </div>
