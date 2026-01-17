@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useCallback, useState } from 'react';
+import { use, useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getNextQuestion, runCode, submitAnswer, getHint, getHistory, getQuestionById } from '../../../../lib/api';
 import { useAppDispatch, useAppSelector } from '../../../../lib/store';
@@ -61,6 +61,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   
   // UI local state (layout related)
   const [leftWidth, setLeftWidth] = useState(480);
+  const mainRef = useRef<HTMLDivElement>(null);
   const [consoleHeight, setConsoleHeight] = useState(300);
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
   const [isDraggingConsole, setIsDraggingConsole] = useState(false);
@@ -116,14 +117,25 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   // Layout resizing logic
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      // Calculate available width from container if possible
+      const maxLeftWidth = mainRef.current 
+        ? mainRef.current.offsetWidth - 500 
+        : window.innerWidth - 500;
+
       if (isDraggingLeft) {
         const newWidth = e.clientX;
-        if (newWidth >= 300 && newWidth <= 800) setLeftWidth(newWidth);
+        
+        // Strict clamp
+        const clampedWidth = Math.min(Math.max(newWidth, 300), Math.max(300, maxLeftWidth));
+        setLeftWidth(clampedWidth);
       }
       
       if (isDraggingConsole) {
         const newHeight = window.innerHeight - e.clientY;
-        if (newHeight >= 100 && newHeight <= window.innerHeight - 200) setConsoleHeight(newHeight);
+        const maxConsoleHeight = window.innerHeight - 200; 
+        if (newHeight >= 100 && newHeight <= maxConsoleHeight) {
+            setConsoleHeight(newHeight);
+        }
       }
     };
 
@@ -136,14 +148,17 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       document.body.style.userSelect = 'none';
+      document.body.style.cursor = isDraggingLeft ? 'col-resize' : 'row-resize';
     } else {
       document.body.style.userSelect = '';
+      document.body.style.cursor = '';
     }
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       document.body.style.userSelect = '';
+      document.body.style.cursor = '';
     };
   }, [isDraggingLeft, isDraggingConsole]);
 
@@ -266,6 +281,11 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
 
   return (
     <div className="h-screen flex bg-slate-950 text-slate-100 font-sans overflow-hidden">
+      {/* Dragging Overlay to prevent event loss over iframes/editor */}
+      {(isDraggingLeft || isDraggingConsole) && (
+        <div className="fixed inset-0 z-[9999] cursor-grabbing bg-transparent" />
+      )}
+
       {/* Backdrop overlay when sidebar is open */}
       {isSidebarOpen && (
         <div 
@@ -400,11 +420,11 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
             </div>
         </header>
         
-        <main className="flex-1 flex overflow-hidden relative">
+        <main ref={mainRef} className="flex-1 flex overflow-hidden relative">
             {/* Left Panel: Question */}
             <div 
             className="flex flex-col border-r border-slate-700/50 bg-gradient-to-b from-slate-900/50 to-slate-900/30 backdrop-blur-sm"
-            style={{ width: `${leftWidth}px`, minWidth: '320px', maxWidth: '800px' }}
+            style={{ width: `${leftWidth}px`, minWidth: '320px' }}
             >
               <QuestionPanel question={question} loading={loading} />
             </div>
@@ -419,7 +439,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
             </div>
 
             {/* Right Panel: Editor & Output */}
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative w-0">
             {/* Hint Overlay */}
             {isHintOpen && hint && (
                 <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-8 animate-in fade-in duration-200">

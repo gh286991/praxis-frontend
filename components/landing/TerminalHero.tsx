@@ -78,7 +78,10 @@ export function TerminalHero() {
     const logoChars = ASCII_LOGO.split('');
     const interval = setInterval(() => {
       if (i < logoChars.length) {
-        setDisplayedLogo((prev) => prev + logoChars[i]);
+        const char = logoChars[i];
+        if (char) {
+          setDisplayedLogo((prev) => prev + char);
+        }
         i++;
       } else {
         clearInterval(interval);

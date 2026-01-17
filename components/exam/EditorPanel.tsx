@@ -49,7 +49,8 @@ export function EditorPanel({ code, onChange, onRun, isExecuting }: EditorPanelP
             cursorBlinking: "smooth",
             cursorSmoothCaretAnimation: "on",
             lineHeight: 24,
-            letterSpacing: 0.5
+            letterSpacing: 0.5,
+            automaticLayout: true
           }}
         />
       </div>
