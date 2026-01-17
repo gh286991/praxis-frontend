@@ -1,7 +1,7 @@
 // Backward compatibility - export all the old API functions
 // This allows existing code to continue working while we migrate
 
-import { questionsApi, executionApi, subjectsApi, statsApi, authApi, usersApi } from './api';
+import { questionsApi, executionApi, subjectsApi, statsApi } from './api';
 
 // Re-export individual functions for backward compatibility
 export const getNextQuestion = questionsApi.getNext;
@@ -20,5 +20,4 @@ export const getSubjectStats = statsApi.getSubject;
 export const getPlatformStats = statsApi.getPlatform;
 
 // Also export the new modular API
-export { default as api } from './api';
 export * from './api';
