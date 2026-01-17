@@ -88,4 +88,9 @@ export const getSubjectStats = async (slug: string) => {
   return response.data;
 };
 
+export const getPlatformStats = async () => {
+  const response = await api.get('/stats/platform');
+  return response.data;
+};
+
 export default api;

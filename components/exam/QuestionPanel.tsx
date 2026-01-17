@@ -43,7 +43,7 @@ export function QuestionPanel({ question, loading }: QuestionPanelProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 space-y-6">
+    <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
       <div className="space-y-4">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 border border-indigo-500/30 rounded-full">
           <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />

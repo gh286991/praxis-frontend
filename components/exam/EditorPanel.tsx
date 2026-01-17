@@ -48,9 +48,15 @@ export function EditorPanel({ code, onChange, onRun, isExecuting }: EditorPanelP
             smoothScrolling: true,
             cursorBlinking: "smooth",
             cursorSmoothCaretAnimation: "on",
+            wordWrap: 'on',
             lineHeight: 24,
             letterSpacing: 0.5,
-            automaticLayout: true
+            automaticLayout: true,
+            scrollbar: {
+              verticalScrollbarSize: 8,
+              horizontalScrollbarSize: 8,
+              useShadows: false
+            }
           }}
         />
       </div>

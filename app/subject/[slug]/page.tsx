@@ -2,13 +2,14 @@
 
 import { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, BookOpen, ChevronRight } from 'lucide-react';
+import { ChevronLeft, BarChart2, BookOpen, Shield, Cpu, Activity } from 'lucide-react';
 import { getSubjectBySlug, getCategoriesBySubject } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setCurrentSubject, setCategories, setLoading, fetchSubjectStats } from '@/lib/store/slices/subjectsSlice';
-import { ProgressStats } from '@/components/ProgressStats';
+import { Footer } from '@/components/landing/Footer';
+import { CyberpunkBackground } from '@/components/CyberpunkBackground';
+import { TerminalWindow } from '@/components/TerminalWindow';
+import { DashboardNavbar } from '@/components/DashboardNavbar';
 
 export default function SubjectDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -50,8 +51,6 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
 
     fetchData();
       
-    // Cleanup? Maybe clear current subject on unmount?
-    // For now, keeping it is fine, it caches the last viewed subject.
   }, [slug, router, dispatch]);
 
   const handleStartCategory = (categorySlug: string) => {
@@ -59,156 +58,164 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
   };
 
   const handleBack = () => {
-    router.push('/dashboard');
+    router.back();
   };
 
   if ((loading && !subject) || !subject) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 font-mono relative overflow-hidden">
+        <CyberpunkBackground />
+        <div className="relative z-10 text-center space-y-4">
+            <div className="text-cyan-400 font-bold text-xl animate-pulse flex items-center gap-2 justify-center">
+                <Activity className="w-5 h-5 animate-spin" />
+                <span>INITIALIZING_MODULE_DATA...</span>
+            </div>
+            <div className="w-64 h-1 bg-slate-800 rounded-full mx-auto overflow-hidden">
+                <div className="h-full bg-cyan-500 animate-progress" style={{ width: '60%' }} />
+            </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[url('/grid-pattern.svg')] bg-fixed bg-slate-950 text-slate-200">
-        <div className="fixed inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/90 to-slate-950 pointer-events-none" />
-        
-        {/* Decorative Background Elements */}
-        <div className="fixed top-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-        <div className="fixed bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[100px] pointer-events-none" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-mono selection:bg-indigo-500/30 relative overflow-hidden flex flex-col">
+        <CyberpunkBackground />
 
-      {/* Header */}
-      <header className="relative border-b border-white/5 bg-slate-950/50 backdrop-blur-xl z-50 sticky top-0">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-                <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleBack}
-                className="text-slate-400 hover:text-white hover:bg-white/5 rounded-full"
-                >
-                <ArrowLeft className="h-5 w-5" />
-                </Button>
-                
-                <div className="h-8 w-[1px] bg-white/10 mx-2" />
-
-                <div className="flex items-center gap-3">
-                    <div 
-                        className="p-2 rounded-lg text-xl shadow-[0_0_15px_rgba(255,255,255,0.1)]"
-                        style={{ background: `linear-gradient(135deg, ${subject.color}, transparent)` }}
-                    >
-                        {subject.icon}
-                    </div>
-                    <span className="font-bold text-lg tracking-wide text-white">{subject.name}</span>
-                </div>
-            </div>
-          </div>
-        </div>
-      </header>
+        <DashboardNavbar />
 
       {/* Main Content */}
-      <main className="relative container mx-auto px-6 py-12 z-10">
-        <div className="max-w-7xl mx-auto space-y-12">
-          
-          {/* Hero / Stats Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-                <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400 tracking-tight">
-                    選擇練習類別
-                </h1>
-                <p className="text-slate-400 text-lg max-w-2xl leading-relaxed">
-                    請選擇一個主題開始您的練習。每個類別都包含多個精選題目，幫助您循序漸進地掌握 {subject.name} 的核心概念。
-                </p>
-                <div className="flex items-center gap-4 pt-4">
-                    <div className="px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm font-medium">
-                        {categories.length} 個章節
-                    </div>
-                    <div className="px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-sm font-medium">
-                        Python 3.10+
-                    </div>
-                </div>
+      <main className="relative container mx-auto px-6 py-12 z-20 flex-1">
+        <div className="max-w-7xl mx-auto space-y-8">
+            {/* Breadcrumb / Back Navigation */}
+           <div className="flex items-center gap-2">
+                <button 
+                onClick={handleBack}
+                className="group flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors"
+                >
+                    <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-xs font-bold tracking-widest uppercase">[ RETURN_PREVIOUS ]</span>
+                </button>
             </div>
 
-            {/* Stats Card */}
-            <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity" />
-                <div className="relative bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl p-6 h-full shadow-2xl">
-                    {currentSubjectStats && (currentSubjectStats.completedQuestions > 0) ? (
-                        <ProgressStats stats={currentSubjectStats} title="學習概況" className="h-full justify-center flex flex-col" />
-                    ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-center space-y-3 p-4">
-                            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center">
-                                <BookOpen className="w-6 h-6 text-slate-500" />
-                            </div>
-                            <h3 className="text-white font-medium">尚未開始練習</h3>
-                            <p className="text-sm text-slate-500">完成題目後將在此顯示您的學習數據</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-          </div>
-
-          <div className="h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-
-          {/* Category Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {categories.map((category, index) => (
-              <div
-                key={category._id}
-                onClick={() => handleStartCategory(category.slug)}
-                className="group relative cursor-pointer"
-              >
-                {/* Glow Effect */}
-                <div 
-                    className="absolute inset-x-4 bottom-0 h-2 bg-gradient-to-r from-indigo-500 to-cyan-500 blur-lg opacity-0 group-hover:opacity-40 transition-opacity duration-500" 
-                />
-                
-                <Card className="relative h-full bg-slate-900/40 border-slate-800/60 hover:border-indigo-500/30 transition-all duration-300 overflow-hidden backdrop-blur-sm shadow-lg group-hover:-translate-y-1">
-                  
-                  {/* Decorative Gradient Overlay */}
-                  <div className="absolute top-0 right-0 p-20 bg-gradient-to-bl from-indigo-500/5 to-transparent rounded-bl-full pointer-events-none" />
-
-                  <CardHeader className="relative p-6 z-10">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-800/50 border border-white/5 text-slate-300 font-mono font-bold text-sm shadow-inner group-hover:bg-indigo-500/20 group-hover:border-indigo-500/30 group-hover:text-indigo-300 transition-colors">
-                            {(index + 1).toString().padStart(2, '0')}
-                        </div>
-                        <div className="p-2 rounded-full bg-slate-800/50 text-slate-500 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 transition-colors">
-                            <ChevronRight className="w-4 h-4" />
-                        </div>
-                    </div>
-
-                    <CardTitle className="text-xl font-bold text-white mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-indigo-300 group-hover:to-cyan-300 transition-all">
-                      {category.name}
-                    </CardTitle>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6"> 
                     
-                    <CardDescription className="text-slate-400 line-clamp-2 leading-relaxed">
-                      {category.description || `練習 ${category.name} 相關的程式設計概念與技巧。`}
-                    </CardDescription>
-                  </CardHeader>
-                  
-                  {/* Bottom Highlight */}
-                  <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-gradient-to-r from-indigo-500 to-cyan-500 group-hover:w-full transition-all duration-500 ease-out" />
-                </Card>
-              </div>
-            ))}
-          </div>
+                    {/* Header / Info Panel */}
+                    <div className="lg:col-span-12">
+                         <div className="bg-slate-900/80 border border-slate-700/50 p-6 md:p-8 rounded-2xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <Shield className="w-32 h-32 text-indigo-500" />
+                            </div>
+                            
+                            <div className="relative z-10">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-4">
+                                    <Cpu className="w-3 h-3" />
+                                    Active Module
+                                </div>
+                                <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-indigo-200 tracking-tight mb-4">
+                                    {subject.name}
+                                </h1>
+                                <p className="text-slate-400 max-w-2xl text-sm md:text-base leading-relaxed">
+                                    系統已載入 <span className="text-cyan-400 font-bold">{subject.name}</span> 題庫模組。 
+                                    目前共有 <span className="text-white font-bold">{categories.length}</span> 個核心單元可供存取。
+                                    請選擇下方單元以啟動練習程序。
+                                </p>
+                            </div>
+                         </div>
+                    </div>
 
-          {/* Empty State */}
-          {!loading && categories.length === 0 && (
-            <div className="text-center py-20 rounded-3xl bg-slate-900/30 border border-dashed border-slate-800">
-              <div className="relative inline-block mb-6">
-                <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20" />
-                <BookOpen className="relative w-16 h-16 text-slate-600 mx-auto" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">此題庫暫無類別</h3>
-              <p className="text-slate-500 text-lg">更多內容即將上線</p>
+                    {/* Left Column: Stats */}
+                    <div className="lg:col-span-4 space-y-6">
+                        <TerminalWindow title="SYSTEM_DIAGNOSTICS">
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-2 text-emerald-400 border-b border-emerald-500/20 pb-2">
+                                    <BarChart2 className="w-4 h-4" />
+                                    <h3 className="text-xs font-bold tracking-widest uppercase">PROGRESS_METRICS</h3>
+                                </div>
+
+                                {currentSubjectStats && currentSubjectStats.completedQuestions > 0 ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-slate-900/50 p-4 rounded border border-slate-700/50">
+                                            <div className="flex justify-between items-end mb-1">
+                                                <span className="text-[10px] text-slate-500 uppercase">Completion</span>
+                                                <span className="text-xl font-light text-cyan-400">
+                                                    {Math.round((currentSubjectStats.completedQuestions / Math.max(currentSubjectStats.totalQuestions, 1)) * 100)}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-cyan-500" 
+                                                    style={{ width: `${(currentSubjectStats.completedQuestions / Math.max(currentSubjectStats.totalQuestions, 1)) * 100}%` }} 
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="bg-slate-900/50 p-3 rounded border border-slate-700/50">
+                                                <div className="text-[10px] text-slate-500 uppercase mb-1">Solved</div>
+                                                <div className="text-lg font-mono text-white">{currentSubjectStats.completedQuestions}</div>
+                                            </div>
+                                            <div className="bg-slate-900/50 p-3 rounded border border-slate-700/50">
+                                                <div className="text-[10px] text-slate-500 uppercase mb-1">Total</div>
+                                                <div className="text-lg font-mono text-slate-400">{currentSubjectStats.totalQuestions}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 opacity-50">
+                                        <Activity className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                                        <p className="text-xs text-slate-500">NO_DATA_AVAILABLE</p>
+                                    </div>
+                                )}
+                            </div>
+                        </TerminalWindow>
+                    </div>
+
+                    {/* Right Column: Categories */}
+                    <div className="lg:col-span-8">
+                        <TerminalWindow title={`ROOT/${subject.slug.toUpperCase()}/CHAPTERS`}>
+                            <div className="space-y-4">
+                                {categories.length > 0 ? (
+                                    categories.map((category, index) => (
+                                        <button
+                                            key={category._id}
+                                            onClick={() => handleStartCategory(category.slug)}
+                                            className="w-full text-left group relative overflow-hidden bg-slate-900/40 hover:bg-slate-800/60 border border-slate-700/50 hover:border-cyan-500/50 transition-all duration-300 p-4 rounded flex items-center gap-4"
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                        >
+                                            <div className="flex-shrink-0 w-10 h-10 bg-slate-800 border border-slate-700 rounded flex items-center justify-center text-slate-500 font-mono text-sm group-hover:text-cyan-400 group-hover:border-cyan-500/50 transition-colors">
+                                                {(index + 1).toString().padStart(2, '0')}
+                                            </div>
+                                            
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-slate-200 font-bold group-hover:text-cyan-300 transition-colors truncate">
+                                                    {category.name}
+                                                </h3>
+                                                <p className="text-xs text-slate-500 font-mono truncate opacity-60 group-hover:opacity-100 transition-opacity">
+                                                    DIR: /mnt/data/{category.slug}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                                                <span className="text-xs text-cyan-500 font-mono">[ LOAD_MODULE ]</span>
+                                            </div>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-12 border border-dashed border-slate-800 rounded">
+                                        <BookOpen className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                                        <div className="text-slate-600 mb-2">NO DATA MODULES FOUND</div>
+                                    </div>
+                                )}
+                            </div>
+                        </TerminalWindow>
+                    </div>
+
+                </div>
             </div>
-          )}
-        </div>
-      </main>
+        </main>
+        <Footer />
     </div>
   );
 }
+
