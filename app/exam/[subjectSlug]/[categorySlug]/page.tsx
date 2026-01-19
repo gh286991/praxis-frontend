@@ -23,6 +23,7 @@ import {
 import { QuestionPanel } from '@/components/exam/QuestionPanel';
 import { EditorPanel } from '@/components/exam/EditorPanel';
 import { ConsolePanel } from '@/components/exam/ConsolePanel';
+import { StreamingSubmissionModal } from '@/components/exam/StreamingSubmissionModal';
 import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -74,25 +75,21 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   // Hook 2: Remote Execution for "Submit" (Streaming)
   const { 
       submitCodeWithStream, 
-      output: remoteOutput, 
+      systemMessages,      // For Modal display
+      executionOutput,     // For Console (not used for Submit, only for Run)
       isLoading: isRemoteLoading 
   } = useRemoteExecution();
 
-  // Sync Output to Redux
-  // We prioritize the one that is active or changed last.
-  // Simple logic: if Local output changes, set it. If Remote adds logs, set it.
-  
+  // State for Submission Progress Modal
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+
+  // Sync Local Output to Redux Console
+  // Only sync LOCAL execution output (Run button), not remote submission
   useEffect(() => {
     if (localOutput.length > 0) {
       dispatch(setOutput(localOutput.join('\n')));
     }
   }, [localOutput, dispatch]);
-
-  useEffect(() => {
-    if (remoteOutput.length > 0) {
-      dispatch(setOutput(remoteOutput.join('\n')));
-    }
-  }, [remoteOutput, dispatch]);
 
   const examId = categorySlug;
   
@@ -110,6 +107,12 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
 
   // Result state
   const [isPassed, setIsPassed] = useState<boolean | undefined>(undefined);
+  const [runResults, setRunResults] = useState<{
+    input: string;
+    output: string;
+    expected: string;
+    passed: boolean;
+  }[]>([]);
 
 
 
@@ -126,18 +129,54 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     dispatch(setExecuting(true));
     dispatch(setOutput('Initializing local Python environment...'));
     setIsPassed(undefined); // Reset status
+    setRunResults([]); // Reset results
 
     try {
-      const inputToUse = question?.sampleInput || '';
+      // Determine samples to run
+      // Prioritize `samples` array, fallback to legacy `sampleInput`/`sampleOutput`
+      let samplesToRun = [];
+      if (question?.samples && question.samples.length > 0) {
+          samplesToRun = question.samples;
+      } else if (question?.sampleInput) {
+          samplesToRun = [{ input: question.sampleInput, output: question.sampleOutput }];
+      } else {
+          // No samples available, just run once with empty input
+          samplesToRun = [{ input: '', output: '' }];
+      }
       
-      // Use Local Pyodide
-      const { output: actualOutput, error } = await runLocalCode(code, inputToUse);
+      const results = [];
       
-      // Pass/Fail Logic for simple run (optional, user might just want to see output)
-      if (question?.sampleOutput) {
-          const actualTrimmed = actualOutput.trim();
-          const expectedTrimmed = question.sampleOutput.trim();
-          setIsPassed(!error && actualTrimmed === expectedTrimmed);
+      for (const sample of samplesToRun) {
+          // Use Local Pyodide
+          const { output: actualOutput, error } = await runLocalCode(code, sample.input || '');
+          
+          // Pass/Fail Logic
+          let passed = false;
+          // If sample has output to compare
+          if (sample.output) {
+              const actualTrimmed = actualOutput.trim();
+              const expectedTrimmed = sample.output.trim();
+              passed = !error && actualTrimmed === expectedTrimmed;
+          } else {
+              // If no expected output, usually just run? 
+              // But for TQC, usually there is expected output. 
+              // If not, we can assume passed if no error?
+              passed = !error;
+          }
+          
+          results.push({
+              input: sample.input || '',
+              output: error ? `Error: ${error}` : actualOutput,
+              expected: sample.output || '',
+              passed
+          });
+      }
+      
+      setRunResults(results);
+      
+      // If we have valid checks, set global passed status
+      if (results.some(r => r.expected)) {
+          setIsPassed(results.every(r => r.passed));
       }
 
     } catch (e) {
@@ -253,6 +292,8 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
       dispatch(setIsCompleted(false));
       dispatch(setCode('# write your code here\nprint("Hello World")'));
       
+      setRunResults([]);
+      setIsPassed(undefined);
       fetchHistoryData();
     } catch (e) {
       alert('Error generating question');
@@ -277,6 +318,11 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
           dispatch(setIsHintOpen(false));
           setIsSidebarOpen(false);
           dispatch(setIsCompleted(true));
+          setRunResults([]);
+          setIsPassed(item.isCorrect); // Restore passed status from history if available? actually history doesn't store runs details usually, just final result.
+          // But if we load history, we typically don't have the "runs" that led to it unless we store them. 
+          // For now, clear them so user can run again.
+          setIsPassed(undefined);
       } catch (e) {
           console.error(e);
           alert('Failed to load question');
@@ -315,11 +361,12 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     if (!question) return;
     
     dispatch(setSubmissionLoading(true));
-    dispatch(setOutput('Connecting to submission server...')); // Initial feedback
+    // Open Submission Modal immediately
+    setIsSubmissionModalOpen(true);
 
     try {
       // Use Remote Streaming Submission
-      // The hook handles real-time console updates (Queued -> Processing -> Completed)
+      // systemMessages will be displayed in the Modal in real-time
       const { passed, results, error } = await submitCodeWithStream(code, question._id);
       
       console.log('DEBUG: Submission returned', { passed, results, error });
@@ -359,8 +406,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
       
     } catch (e: any) {
       console.error('Submission error:', e);
-      dispatch(setOutput(`Submission Error: ${e.message || e}`));
-      // alert('提交失敗 (Submission Failed)'); // Console output is enough
+      // Don't show error in console, show in Modal
     } finally {
       dispatch(setSubmissionLoading(false));
     }
@@ -652,132 +698,22 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 </div>
             )}
 
-            {/* Submission Result Modal */}
-            {submissionResult && (
-                <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="bg-slate-900 border border-slate-700/50 rounded-lg shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                            <div className="flex items-center gap-3">
-                                {submissionResult.isCorrect ? (
-                                    <div className="p-2 bg-emerald-500/10 rounded-full">
-                                        <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                                    </div>
-                                ) : (
-                                    <div className="p-2 bg-rose-500/10 rounded-full">
-                                        <XCircle className="w-6 h-6 text-rose-400" />
-                                    </div>
-                                )}
-                                <div>
-                                    <h2 className="text-xl font-bold text-white tracking-tight">
-                                        {submissionResult.isCorrect ? 'CHALLENGE COMPLETED' : 'SUBMISSION FAILED'}
-                                    </h2>
-                                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">
-                                        Evaluation Report
-                                    </p>
-                                </div>
-                            </div>
-                            <button 
-                                onClick={() => dispatch(setSubmissionResult(null))}
-                                className="text-slate-500 hover:text-white hover:bg-slate-800 p-2 rounded-full transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        
-                        <div className="p-0 overflow-y-auto custom-scrollbar flex-1">
-                             {/* AI Feedback Section */}
-                             <div className="p-6 border-b border-slate-800 bg-slate-800/20">
-                                <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4" />
-                                    AI Security & Logic Analysis
-                                </h3>
-                                <div className={`p-4 rounded-lg border ${submissionResult.semanticResult.passed ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
-                                    <div className="flex items-start gap-3">
-                                        {submissionResult.semanticResult.passed ? (
-                                            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                                        ) : (
-                                            <Lightbulb className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                                        )}
-                                        <div>
-                                            <p className={`font-bold text-sm mb-1 ${submissionResult.semanticResult.passed ? 'text-emerald-300' : 'text-amber-300'}`}>
-                                                {submissionResult.semanticResult.passed ? 'Logic Verified' : 'Logic Recommendations'}
-                                            </p>
-                                            <p className="text-slate-300 text-sm leading-relaxed">
-                                                {submissionResult.semanticResult.feedback}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                             </div>
-
-                             {/* Test Cases Section */}
-                             <div className="p-6">
-                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <Code2 className="w-4 h-4" />
-                                    Test Case Execution
-                                </h3>
-                                <div className="space-y-3">
-                                    {submissionResult.testResult.results.map((result: any, index: number) => (
-                                        <div key={index} className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden">
-                                            <div className={`px-4 py-2 flex items-center justify-between border-b border-slate-800 ${result.passed ? 'bg-emerald-500/5' : 'bg-rose-500/5'}`}>
-                                                <span className="font-mono text-xs text-slate-400 uppercase">Test Case #{index + 1}</span>
-                                                {result.passed ? (
-                                                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                                        <CheckCircle2 className="w-3 h-3" /> PASS
-                                                    </span>
-                                                ) : (
-                                                    <span className="flex items-center gap-1.5 text-xs font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                                                        <XCircle className="w-3 h-3" /> FAIL
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="p-4 grid grid-cols-2 gap-4 text-xs font-mono">
-                                                <div>
-                                                    <div className="text-slate-500 mb-1">Input:</div>
-                                                    <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre-wrap">{result.input}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-slate-500 mb-1">Expected:</div>
-                                                    <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre-wrap">{result.expected}</div>
-                                                </div>
-                                                {!result.passed && (
-                                                    <div className="col-span-2">
-                                                        <div className="text-rose-400/80 mb-1">Actual Output:</div>
-                                                        <div className="bg-rose-950/10 p-2 rounded text-rose-300 border border-rose-500/20 overflow-x-auto whitespace-pre-wrap">
-                                                            {result.error ? `Error: ${result.error}` : result.actual}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                             </div>
-                        </div>
-                        
-                        <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
-                            <Button 
-                                variant="outline" 
-                                onClick={() => dispatch(setSubmissionResult(null))}
-                                className="border-slate-700 hover:bg-slate-800 text-slate-300"
-                            >
-                                Close Report
-                            </Button>
-                            {submissionResult.isCorrect && (
-                                <Button 
-                                    onClick={() => {
-                                        dispatch(setSubmissionResult(null));
-                                        handleGenerate(); // Next question
-                                    }}
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
-                                >
-                                    Next Challenge <SkipForward className="w-4 h-4 ml-2" />
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Streaming Submission Modal - Shows streaming status and results */}
+            <StreamingSubmissionModal
+              isOpen={isSubmissionModalOpen}
+              isLoading={submissionLoading}
+              messages={systemMessages}
+              submissionResult={submissionResult}
+              onClose={() => {
+                setIsSubmissionModalOpen(false);
+                dispatch(setSubmissionResult(null));
+              }}
+              onNextChallenge={() => {
+                setIsSubmissionModalOpen(false);
+                dispatch(setSubmissionResult(null));
+                handleGenerate();
+              }}
+            />
 
             <EditorPanel 
               code={code}
@@ -801,6 +737,8 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
               input={question?.sampleInput}
               expectedOutput={question?.sampleOutput}
               passed={isPassed}
+              samples={question?.samples}
+              results={runResults}
             />
             </div>
         </main>

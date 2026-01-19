@@ -6,6 +6,7 @@ export interface Question {
   description: string;
   sampleInput: string;
   sampleOutput: string;
+  samples: { input: string; output: string; explanation?: string }[];
   testCases: { input: string; output: string }[];
 }
 

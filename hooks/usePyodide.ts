@@ -89,23 +89,28 @@ export function usePyodide(): UsePyodideReturn {
       return { output: '', error: 'Pyodide is not loaded yet' };
     }
 
-    // Reset output specific to this run can be handled by caller, but we append here generally.
-    // However, for "Run", we typically want to clear previous output or invalid commands?
-    // Let's clear for fresh run
+    // Reset output specific to this run
     setOutput([]); 
+    const capturedOutput: string[] = [];
+
+    const handleOutput = (msg: string) => {
+        capturedOutput.push(msg);
+        setOutput((prev) => [...prev, msg]);
+    };
+    
+    const handleError = (msg: string) => {
+        const errorMsg = `Error: ${msg}`;
+        capturedOutput.push(errorMsg);
+        setOutput((prev) => [...prev, errorMsg]);
+    };
 
     try {
       // Setup stdin/stdout
-      pyodideRef.current.setStdout({ batched: (msg: string) => setOutput((prev) => [...prev, msg]) });
-      pyodideRef.current.setStderr({ batched: (msg: string) => setOutput((prev) => [...prev, `Error: ${msg}`]) });
+      pyodideRef.current.setStdout({ batched: handleOutput });
+      pyodideRef.current.setStderr({ batched: handleError });
       
       // Mock input() if needed
-      // Simple input support via prompt or pre-fed input? 
-      // User passed `input` arg.
-      // We can patch `input()` function in Python.
       if (input) {
-          // A bit hacky: override input
-          // Better: use pyodide.setStdin if available or custom function
           const stdinIterator = (function* () {
              const lines = input.split('\n');
              for(let line of lines) yield line;
@@ -114,11 +119,11 @@ export function usePyodide(): UsePyodideReturn {
       }
 
       await pyodideRef.current.runPythonAsync(code);
-      return { output: '', error: null }; // Output captured via callbacks
+      return { output: capturedOutput.join('\n'), error: null }; 
     } catch (err: any) {
       const errorMsg = err.toString();
       setOutput((prev) => [...prev, errorMsg]);
-      return { output: '', error: errorMsg };
+      return { output: capturedOutput.join('\n'), error: errorMsg };
     }
   }, []);
 
