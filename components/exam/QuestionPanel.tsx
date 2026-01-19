@@ -1,16 +1,35 @@
-import { Sparkles } from 'lucide-react';
-
-interface Question {
-  title: string;
-  description: string;
-  sampleInput: string;
-  sampleOutput: string;
-}
+import { Sparkles, Hash } from 'lucide-react';
+import { Question, Tag } from '@/lib/store/slices/questionsSlice';
 
 interface QuestionPanelProps {
   question: Question | null;
   loading?: boolean;
 }
+
+const getTagColor = (type: string) => {
+  switch (type) {
+    case 'concept':
+      return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    case 'algorithm':
+      return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+    case 'data_structure':
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    case 'language_feature':
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    default:
+      return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+  }
+};
+
+const getTagLabel = (type: string) => {
+  switch (type) {
+    case 'concept': return '概念';
+    case 'algorithm': return '演算法';
+    case 'data_structure': return '資料結構';
+    case 'language_feature': return '語法';
+    default: return '標籤';
+  }
+};
 
 export function QuestionPanel({ question, loading }: QuestionPanelProps) {
   if (loading) {
@@ -45,10 +64,27 @@ export function QuestionPanel({ question, loading }: QuestionPanelProps) {
   return (
     <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
       <div className="space-y-4">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 border border-indigo-500/30 rounded-full">
-          <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-          <span className="text-xs font-bold tracking-wider text-indigo-300 uppercase">題目</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full">
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+            <span className="text-[10px] font-bold tracking-wider text-indigo-300 uppercase">題目</span>
+          </div>
+
+          {/* Tags */}
+          {question.tags && question.tags.length > 0 && question.tags.map((tag) => (
+             typeof tag === 'object' && tag.name ? (
+                <div 
+                  key={tag._id} 
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-medium tracking-wide ${getTagColor(tag.type)}`}
+                  title={tag.description || getTagLabel(tag.type)}
+                >
+                  <Hash className="w-3 h-3 opacity-70" />
+                  {tag.name}
+                </div>
+             ) : null
+          ))}
         </div>
+        
         <h2 className="text-3xl font-bold text-white leading-tight tracking-tight">{question.title}</h2>
         <div className="prose prose-invert prose-slate max-w-none">
           <p className="text-slate-300 text-base leading-relaxed whitespace-pre-wrap">{question.description}</p>

@@ -1,5 +1,14 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+export interface Tag {
+  _id: string;
+  name: string;
+  slug: string;
+  type: string;
+  language?: string;
+  description?: string;
+}
+
 export interface Question {
   _id: string;
   title: string;
@@ -8,6 +17,9 @@ export interface Question {
   sampleOutput: string;
   samples: { input: string; output: string; explanation?: string }[];
   testCases: { input: string; output: string }[];
+  tags: Tag[];
+  difficulty?: 'easy' | 'medium' | 'hard';
+  constraints?: string;
 }
 
 export interface HistoryItem {
