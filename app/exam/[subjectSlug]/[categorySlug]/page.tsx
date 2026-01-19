@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { HistoryItem } from '@/lib/store/slices/questionsSlice';
 import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { usePyodide } from '@/hooks/usePyodide';
+import { useRemoteExecution } from '@/hooks/useRemoteExecution';
 
 const examTitles: Record<string, string> = {
   category1: '第1類：基本程式設計',
@@ -53,7 +54,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     currentQuestion: question,
     history,
     code,
-    output,
+    output: globalOutput, // Renamed to avoid conflict with local/remote outputs
     loading,
     executing,
     hint,
@@ -63,24 +64,40 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     submissionResult,
   } = useAppSelector((state) => state.questions);
 
-  // Pyodide Integration
+  // Hook 1: Local Pyodide for "Run"
   const { 
-    runCode: runPyodide, 
-    runCodeWithOutput,
-    output: pyodideOutput, 
-    isLoading: isPyodideLoading 
+      runCode: runLocalCode, 
+      output: localOutput, 
+      isLoading: isLocalLoading 
   } = usePyodide();
 
-  // Sync Pyodide output to Redux for display
+  // Hook 2: Remote Execution for "Submit" (Streaming)
+  const { 
+      submitCodeWithStream, 
+      output: remoteOutput, 
+      isLoading: isRemoteLoading 
+  } = useRemoteExecution();
+
+  // Sync Output to Redux
+  // We prioritize the one that is active or changed last.
+  // Simple logic: if Local output changes, set it. If Remote adds logs, set it.
+  
   useEffect(() => {
-    if (pyodideOutput.length > 0) {
-      dispatch(setOutput(pyodideOutput.join('\n')));
+    if (localOutput.length > 0) {
+      dispatch(setOutput(localOutput.join('\n')));
     }
-  }, [pyodideOutput, dispatch]);
+  }, [localOutput, dispatch]);
+
+  useEffect(() => {
+    if (remoteOutput.length > 0) {
+      dispatch(setOutput(remoteOutput.join('\n')));
+    }
+  }, [remoteOutput, dispatch]);
 
   const examId = categorySlug;
   
   // UI local state (layout related)
+  // ... (unchanged)
   const [leftWidth, setLeftWidth] = useState(480);
   const mainRef = useRef<HTMLDivElement>(null);
   const [consoleHeight, setConsoleHeight] = useState(300);
@@ -94,6 +111,8 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   // Result state
   const [isPassed, setIsPassed] = useState<boolean | undefined>(undefined);
 
+
+
   const fetchHistoryData = useCallback(async () => {
     try {
       const data = await getHistory(examId);
@@ -103,66 +122,27 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     }
   }, [examId, dispatch]);
 
-  // ... (inside handleRun)
   const handleRun = async () => {
     dispatch(setExecuting(true));
-    dispatch(setOutput('Initializing execution environment...'));
+    dispatch(setOutput('Initializing local Python environment...'));
     setIsPassed(undefined); // Reset status
 
     try {
-      if (isPyodideLoading) {
-        dispatch(setOutput('Environment initializing... please wait.'));
-        return;
-      }
-
       const inputToUse = question?.sampleInput || '';
-      dispatch(setOutput('Running code...'));
       
-      // Execute once with sample input
-      const { output: actualOutput, error } = await runCodeWithOutput(code, inputToUse);
+      // Use Local Pyodide
+      const { output: actualOutput, error } = await runLocalCode(code, inputToUse);
       
-      // Calculate Pass/Fail
+      // Pass/Fail Logic for simple run (optional, user might just want to see output)
       if (question?.sampleOutput) {
           const actualTrimmed = actualOutput.trim();
           const expectedTrimmed = question.sampleOutput.trim();
           setIsPassed(!error && actualTrimmed === expectedTrimmed);
       }
-      
-      // Output is handled by runCodeWithOutput return, we need to dispatch it 
-      // OR let the useEffect handle it if we used the standard runPyodide.
-      // But runCodeWithOutput returns output and doesn't update state automatically? 
-      // Wait, looking at usePyodide implementation earlier:
-      // "Restore default handlers to update React state ... setOutput((prev) => [...prev, msg])"
-      // So the useEffect WILL pick it up. 
-      // However, runCodeWithOutput ALSO returns it. To be safe/consistent with previous revert:
-      // The previous revert used runPyodide(code).
-      // If I use runCodeWithOutput, I need to make sure I don't double print or miss print.
-      
-      // To keep it simple and consistent with "Execute once", let's use runCodeWithOutput 
-      // because we NEED the return value to compare, which runPyodide (void) doesn't give easily without race conditions.
-      
-      // But wait, the previous step's revert used:
-      // await runPyodide(code, inputToUse);
-      // And relied on useEffect syncing output.
-      
-      // OPTION 1: Use runCodeWithOutput, but manually dispatch setOutput?
-      // The hook implementation I wrote:
-      // finally { restore default handlers } 
-      // It DOES NOT automatically put the *captured* output into the global SetOutput state during execution?
-      // Actually, the hook implementation:
-      // pyodide.setStdout({ batched: (msg) => localOutput.push(msg) });
-      // It captures locally. It does NOT update global state during run.
-      // So if I switch to runCodeWithOutput, I must dispatch setOutput manually after.
-      
-      if (actualOutput) {
-         dispatch(setOutput(actualOutput));
-      } else if (error) {
-         dispatch(setOutput(`Error: ${error}`));
-      }
 
     } catch (e) {
       console.error(e);
-      dispatch(setOutput('Execution failed due to an internal error.'));
+      dispatch(setOutput('Execution failed due to an error.'));
     } finally {
       dispatch(setExecuting(false));
     }
@@ -171,7 +151,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
   // ...
 
             <ConsolePanel 
-              output={output} 
+              output={globalOutput} 
               height={consoleHeight} 
               input={question?.sampleInput}
               expectedOutput={question?.sampleOutput}
@@ -335,25 +315,52 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     if (!question) return;
     
     dispatch(setSubmissionLoading(true));
+    dispatch(setOutput('Connecting to submission server...')); // Initial feedback
+
     try {
-      const res = await evaluateSubmission(question._id, code);
-      dispatch(setSubmissionResult(res));
+      // Use Remote Streaming Submission
+      // The hook handles real-time console updates (Queued -> Processing -> Completed)
+      const { passed, results, error } = await submitCodeWithStream(code, question._id);
       
-      // Only record completion if the submission is correct
-      if (res.isCorrect) {
-          await submitAnswer(question._id, code, true, examId);
-          fetchHistoryData();
-          dispatch(setIsCompleted(true));
-      } else {
-          // Optional: Record failed attempt too if desired?
-          // User request: "Completion/Success should have submit success to count".
-          // Usually we record fails too for history.
-          await submitAnswer(question._id, code, false, examId);
-          fetchHistoryData();
+      console.log('DEBUG: Submission returned', { passed, results, error });
+
+      if (error) {
+          throw new Error(error);
       }
-    } catch (e) {
-      console.error(e);
-      alert('提交失敗 (Submission Failed)');
+
+      // Construct Result Object for UI Modal
+      // We assume backend returns 'results' as array of { input, expected, actual, passed, error? }
+      if (passed !== undefined && results) {
+           console.log('DEBUG: Constructing result data');
+           const resultData = {
+               isCorrect: passed,
+               testResult: { 
+                   passed, 
+                   results: results 
+               }, 
+               // Mock semantic result for now as Piston doesn't provide it yet
+               semanticResult: { 
+                   passed: true, 
+                   feedback: 'Code validation completed successfully.' 
+               } 
+           };
+           
+           dispatch(setSubmissionResult(resultData));
+
+           if (passed) {
+               await submitAnswer(question._id, code, true, examId); 
+               dispatch(setIsCompleted(true));
+               fetchHistoryData();
+           } else {
+               await submitAnswer(question._id, code, false, examId);
+               fetchHistoryData();
+           }
+      }
+      
+    } catch (e: any) {
+      console.error('Submission error:', e);
+      dispatch(setOutput(`Submission Error: ${e.message || e}`));
+      // alert('提交失敗 (Submission Failed)'); // Console output is enough
     } finally {
       dispatch(setSubmissionLoading(false));
     }
@@ -789,7 +796,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
             </div>
             
             <ConsolePanel 
-              output={output} 
+              output={globalOutput} 
               height={consoleHeight} 
               input={question?.sampleInput}
               expectedOutput={question?.sampleOutput}

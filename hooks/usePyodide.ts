@@ -1,154 +1,126 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-// Define Pyodide types broadly to avoid strict TS issues before types are loaded
 declare global {
   interface Window {
-    loadPyodide: (config: any) => Promise<any>;
+    loadPyodide: any;
+    pyodide: any;
   }
 }
 
-interface PyodideInterface {
-  runPythonAsync: (code: string) => Promise<string>;
-  loadPackage: (packages: string[]) => Promise<void>;
-  setStdout: (options: { batched: (msg: string) => void }) => void;
-  setStderr: (options: { batched: (msg: string) => void }) => void;
+interface UsePyodideReturn {
+  runCode: (code: string, input?: string) => Promise<{ output: string; error: string | null }>;
+  isLoading: boolean;
+  output: string[];
+  clearOutput: () => void;
 }
 
-export function usePyodide() {
-  const [pyodide, setPyodide] = useState<PyodideInterface | null>(null);
+export function usePyodide(): UsePyodideReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [output, setOutput] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const pyodideRef = useRef<any>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    async function initPyodide() {
+    const loadPyodide = async () => {
       try {
-        // Load Pyodide script
         if (!window.loadPyodide) {
-           const script = document.createElement('script');
-           script.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js';
-           script.async = true;
-           document.body.appendChild(script);
-           await new Promise((resolve) => {
-             script.onload = resolve;
-           });
-        }
-
-        if (!mounted) return;
-
-        const pyodideInstance = await window.loadPyodide({
-          indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/'
-        });
-
-        // Redirect stdout/stderr
-        pyodideInstance.setStdout({
-          batched: (msg: string) => {
-             setOutput((prev) => [...prev, msg]);
-          }
-        });
-        
-        pyodideInstance.setStderr({
-            batched: (msg: string) => {
-               // We might treat stderr as output or separate error
-               // For Python prints, they go to stdout. Errors go to stderr.
-               setOutput((prev) => [...prev, `Error: ${msg}`]);
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js';
+          script.async = true;
+          
+          script.onload = async () => {
+            if (!mounted) return;
+            try {
+              const pyodide = await window.loadPyodide({
+                  indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/'
+              });
+              if (mounted) {
+                pyodideRef.current = pyodide;
+              }
+            } catch (err) {
+              console.error('Failed to initialize Pyodide:', err);
+            } finally {
+              if (mounted) setIsLoading(false);
             }
-        });
+          };
 
-        // Load common packages (optional, can be lazy loaded)
-        // await pyodideInstance.loadPackage(['numpy']); // Example
+          script.onerror = (err) => {
+              console.error('Failed to load Pyodide script from CDN', err);
+              if (mounted) setIsLoading(false);
+          };
 
-        setPyodide(pyodideInstance);
-        setIsLoading(false);
-      } catch (err) {
-        console.error("Failed to load Pyodide", err);
-        setError("Failed to load Python runtime.");
-        setIsLoading(false);
+          document.body.appendChild(script);
+        } else if (!pyodideRef.current) {
+            // Window has loadPyodide but ref is null (re-mount)
+            try {
+                const pyodide = await window.loadPyodide({
+                    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/'
+                });
+                if (mounted) {
+                    pyodideRef.current = pyodide;
+                }
+            } catch (err) {
+                console.error('Failed to re-initialize Pyodide:', err);
+            } finally {
+                if (mounted) setIsLoading(false);
+            }
+        } else {
+            // Already initialized
+            setIsLoading(false);
+        }
+      } catch (e) {
+        console.error('Error in loadPyodide content', e);
+        if (mounted) setIsLoading(false);
       }
-    }
+    };
 
-    initPyodide();
+    loadPyodide();
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const runCode = async (code: string, input: string = '') => {
-    if (!pyodide) return;
-    setOutput([]); // Clear previous output
-    setError(null);
+  const clearOutput = useCallback(() => setOutput([]), []);
+
+  const runCode = useCallback(async (code: string, input: string = '') => {
+    if (!pyodideRef.current) {
+      return { output: '', error: 'Pyodide is not loaded yet' };
+    }
+
+    // Reset output specific to this run can be handled by caller, but we append here generally.
+    // However, for "Run", we typically want to clear previous output or invalid commands?
+    // Let's clear for fresh run
+    setOutput([]); 
 
     try {
-      // Mock stdin if input is provided
-      if (input) {
-          // Escape newlines and quotes properly for the python string
-          const safeInput = JSON.stringify(input); 
-          await pyodide.runPythonAsync(`
-import sys
-import io
-sys.stdin = io.StringIO(${safeInput})
-          `);
-      }
+      // Setup stdin/stdout
+      pyodideRef.current.setStdout({ batched: (msg: string) => setOutput((prev) => [...prev, msg]) });
+      pyodideRef.current.setStderr({ batched: (msg: string) => setOutput((prev) => [...prev, `Error: ${msg}`]) });
       
-      await pyodide.runPythonAsync(code);
-    } catch (err: any) {
-       setError(err.message);
-       // Check if it's a syntax error or runtime error to format nicely
-       setOutput((prev) => [...prev, `Runtime Error: ${err.message}`]);
-    }
-  };
-
-  const runCodeWithOutput = async (code: string, input: string = ''): Promise<{ output: string; error: string | null }> => {
-    if (!pyodide) return { output: '', error: 'Pyodide not loaded' };
-
-    const localOutput: string[] = [];
-    let localError: string | null = null;
-
-    // Override handlers
-    pyodide.setStdout({
-      batched: (msg: string) => localOutput.push(msg),
-    });
-    pyodide.setStderr({
-      batched: (msg: string) => {
-        localOutput.push(`Error: ${msg}`);
-        localError = msg;
-      },
-    });
-
-    try {
+      // Mock input() if needed
+      // Simple input support via prompt or pre-fed input? 
+      // User passed `input` arg.
+      // We can patch `input()` function in Python.
       if (input) {
-        const safeInput = JSON.stringify(input);
-        await pyodide.runPythonAsync(`
-import sys
-import io
-sys.stdin = io.StringIO(${safeInput})
-        `);
+          // A bit hacky: override input
+          // Better: use pyodide.setStdin if available or custom function
+          const stdinIterator = (function* () {
+             const lines = input.split('\n');
+             for(let line of lines) yield line;
+          })();
+          pyodideRef.current.setStdin({ stdin: () => stdinIterator.next().value });
       }
-      await pyodide.runPythonAsync(code);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      localError = errorMessage;
-      localOutput.push(`Runtime Error: ${errorMessage}`);
-    } finally {
-      // Restore default handlers to update React state
-      pyodide.setStdout({
-        batched: (msg: string) => setOutput((prev) => [...prev, msg]),
-      });
-      pyodide.setStderr({
-        batched: (msg: string) => setOutput((prev) => [...prev, `Error: ${msg}`]),
-      });
+
+      await pyodideRef.current.runPythonAsync(code);
+      return { output: '', error: null }; // Output captured via callbacks
+    } catch (err: any) {
+      const errorMsg = err.toString();
+      setOutput((prev) => [...prev, errorMsg]);
+      return { output: '', error: errorMsg };
     }
+  }, []);
 
-    return { output: localOutput.join('\n'), error: localError };
-  };
-
-  const clearOutput = () => {
-      setOutput([]);
-      setError(null);
-  }
-
-  return { pyodide, isLoading, output, error, runCode, runCodeWithOutput, clearOutput };
+  return { runCode, isLoading, output, clearOutput };
 }

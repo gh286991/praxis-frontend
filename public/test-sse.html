@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <head>
+    <title>SSE Test</title>
+  </head>
+  <body>
+    <h1>SSE Submit Stream Test</h1>
+    <button onclick="testSubmit()">Test Submit</button>
+    <pre id="output"></pre>
+
+    <script>
+      async function testSubmit() {
+        const output = document.getElementById("output");
+        output.textContent = "Starting...\n";
+
+        const token = localStorage.getItem("jwt_token");
+        const baseUrl = "http://localhost:3001/api";
+
+        try {
+          const response = await fetch(`${baseUrl}/execution/submit-stream`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              code: 'print("Hello")',
+              questionId: "677f52c64ad4e70013e62c05", // Replace with actual ID
+            }),
+          });
+
+          console.log("Response:", response);
+          output.textContent += `Status: ${response.status}\n`;
+          output.textContent += `Content-Type: ${response.headers.get("content-type")}\n\n`;
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              output.textContent += "\n[DONE]\n";
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            console.log("[CHUNK]", chunk);
+            output.textContent += `[CHUNK] ${chunk}\n`;
+          }
+        } catch (e) {
+          console.error("Error:", e);
+          output.textContent += `\nError: ${e.message}\n`;
+        }
+      }
+    </script>
+  </body>
+</html>
