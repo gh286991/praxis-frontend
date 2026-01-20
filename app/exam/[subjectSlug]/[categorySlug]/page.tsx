@@ -747,6 +747,7 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
               isLoading={submissionLoading}
               messages={systemMessages}
               submissionResult={submissionResult}
+              initialTestCases={question?.testCases || (question?.samples ? question.samples.map((s, i) => ({ input: s.input, output: s.output })) : [])}
               onClose={() => {
                 setIsSubmissionModalOpen(false);
                 dispatch(setSubmissionResult(null));
