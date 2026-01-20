@@ -24,6 +24,7 @@ import { QuestionPanel } from '@/components/exam/QuestionPanel';
 import { EditorPanel } from '@/components/exam/EditorPanel';
 import { ConsolePanel } from '@/components/exam/ConsolePanel';
 import { StreamingSubmissionModal } from '@/components/exam/StreamingSubmissionModal';
+import GenerationModal from '@/components/exam/GenerationModal';
 import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -114,6 +115,11 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
     passed: boolean;
   }[]>([]);
 
+  // State for Generation Modal
+  const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<'idle' | 'progress' | 'success' | 'error'>('idle');
+  const [generationMessages, setGenerationMessages] = useState<string[]>([]);
+
 
 
   const fetchHistoryData = useCallback(async () => {
@@ -147,8 +153,24 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
       const results = [];
       
       for (const sample of samplesToRun) {
-          // Use Local Pyodide
-          const { output: actualOutput, error } = await runLocalCode(code, sample.input || '');
+          // Parse sample input for file content (format: "filename: content")
+          let currentInput = sample.input || '';
+          const currentFileAssets = { ...(question?.fileAssets || {}) };
+          
+          // Check if input follows "filename: content" pattern for file I/O
+          if (question?.fileAssets) {
+            for (const fileName of Object.keys(question.fileAssets)) {
+              if (currentInput.startsWith(fileName + ':')) {
+                const fileContent = currentInput.substring(fileName.length + 1);
+                currentFileAssets[fileName] = fileContent;
+                currentInput = ''; // Clear stdin since it's file content, not stdin input
+                break;
+              }
+            }
+          }
+          
+          // Use Local Pyodide with dynamically updated fileAssets
+          const { output: actualOutput, error } = await runLocalCode(code, currentInput, currentFileAssets);
           
           // Pass/Fail Logic
           let passed = false;
@@ -282,22 +304,86 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
 
   const handleGenerate = async () => {
     dispatch(setLoading(true));
+    setIsGenerationModalOpen(true);
+    setGenerationStatus('progress');
+    setGenerationMessages(['Starting question generation...']);
+
     try {
-      // Use examId (category) directly, forcing new question generation
-      const q = await getNextQuestion(examId, true);
-      dispatch(setCurrentQuestion(q));
-      dispatch(setOutput(''));
-      dispatch(setHint(null));
-      dispatch(setIsHintOpen(false));
-      dispatch(setIsCompleted(false));
-      dispatch(setCode('# write your code here\nprint("Hello World")'));
+      const token = localStorage.getItem('jwt_token');
+      // Force generation to skip database check if desired, or if we want streaming we always force? 
+      // The previous code passed `true` (force). Streaming endpoint supports force param.
       
-      setRunResults([]);
-      setIsPassed(undefined);
-      fetchHistoryData();
-    } catch (e) {
-      alert('Error generating question');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/questions/stream?category=${examId}&force=true`, {
+          headers: {
+              Authorization: `Bearer ${token}`
+          }
+      });
+
+      if (!response.ok) {
+           const errText = await response.text();
+           throw new Error(`Failed to connect: ${response.status} ${errText}`);
+      }
+      
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No readable stream');
+      
+      const decoder = new TextDecoder();
+      let buffer = '';
+      
+      while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+              if (line.trim() === '') continue;
+              if (line.startsWith('data: ')) {
+                  const dataStr = line.slice(6);
+                  try {
+                      const payload = JSON.parse(dataStr);
+                      // payload is { status: 'progress' | 'success' | 'error', message: string, data?: any }
+                      
+                      if (payload.status === 'progress') {
+                          setGenerationMessages(prev => [...prev, payload.message]);
+                      } else if (payload.status === 'success') {
+                           setGenerationStatus('success');
+                           setGenerationMessages(prev => [...prev, payload.message]);
+                           
+                           // Delay closing slightly to show success
+                           setTimeout(() => {
+                               dispatch(setCurrentQuestion(payload.data));
+                               dispatch(setCode('# write your code here\nprint("Hello World")'));
+                               dispatch(setOutput(''));
+                               dispatch(setHint(null));
+                               dispatch(setIsHintOpen(false));
+                               dispatch(setIsCompleted(false));
+                               setRunResults([]);
+                               setIsPassed(undefined);
+                               fetchHistoryData();
+                               
+                               setIsGenerationModalOpen(false);
+                           }, 1500);
+                           return; // Exit loop and function
+                      } else if (payload.status === 'error') {
+                          setGenerationStatus('error');
+                          setGenerationMessages(prev => [...prev, payload.message]);
+                          // Keep modal open so user sees error
+                          return;
+                      }
+                  } catch (e) {
+                      console.error('Parse error', e);
+                  }
+              }
+          }
+      }
+      
+    } catch (e: any) {
       console.error(e);
+      setGenerationStatus('error');
+      setGenerationMessages(prev => [...prev, `Error: ${e.message}`]);
     } finally {
       dispatch(setLoading(false));
     }
@@ -713,6 +799,13 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                 dispatch(setSubmissionResult(null));
                 handleGenerate();
               }}
+            />
+
+            <GenerationModal 
+                isOpen={isGenerationModalOpen}
+                status={generationStatus}
+                messages={generationMessages}
+                onClose={() => setIsGenerationModalOpen(false)}
             />
 
             <EditorPanel 

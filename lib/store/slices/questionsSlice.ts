@@ -20,6 +20,7 @@ export interface Question {
   tags: Tag[];
   difficulty?: 'easy' | 'medium' | 'hard';
   constraints?: string;
+  fileAssets?: Record<string, string>;
 }
 
 export interface HistoryItem {

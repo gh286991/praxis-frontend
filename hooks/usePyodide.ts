@@ -8,7 +8,7 @@ declare global {
 }
 
 interface UsePyodideReturn {
-  runCode: (code: string, input?: string) => Promise<{ output: string; error: string | null }>;
+  runCode: (code: string, input?: string, fileAssets?: Record<string, string>) => Promise<{ output: string; error: string | null }>;
   isLoading: boolean;
   output: string[];
   clearOutput: () => void;
@@ -84,7 +84,7 @@ export function usePyodide(): UsePyodideReturn {
 
   const clearOutput = useCallback(() => setOutput([]), []);
 
-  const runCode = useCallback(async (code: string, input: string = '') => {
+  const runCode = useCallback(async (code: string, input: string = '', fileAssets?: Record<string, string>) => {
     if (!pyodideRef.current) {
       return { output: '', error: 'Pyodide is not loaded yet' };
     }
@@ -116,6 +116,13 @@ export function usePyodide(): UsePyodideReturn {
              for(let line of lines) yield line;
           })();
           pyodideRef.current.setStdin({ stdin: () => stdinIterator.next().value });
+      }
+
+      // Write file assets to virtual filesystem (for file I/O questions)
+      if (fileAssets) {
+        for (const [filename, content] of Object.entries(fileAssets)) {
+          pyodideRef.current.FS.writeFile(filename, content);
+        }
       }
 
       await pyodideRef.current.runPythonAsync(code);

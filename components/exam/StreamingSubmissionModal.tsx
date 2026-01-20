@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, CheckCircle2, XCircle, Clock, Sparkles, Code2, SkipForward, X } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, Code2, SkipForward, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface TestCaseStatus {
@@ -152,27 +152,7 @@ export function StreamingSubmissionModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {/* AI Feedback Section (shown after completion) */}
-          {allComplete && submissionResult?.semanticResult && (
-            <div className="p-6 border-b border-slate-800 bg-slate-800/20">
-              <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                AI Security & Logic Analysis
-              </h3>
-              <div className={`p-4 rounded-lg border ${submissionResult.semanticResult.passed ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-sm mb-1 text-emerald-300">
-                      {submissionResult.semanticResult.passed ? 'Logic Verified' : 'Analysis Complete'}
-                    </p>
-                    <p className="text-slate-300 text-sm leading-relaxed">
-                      {submissionResult.semanticResult.feedback || 'Code validation completed successfully.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {/* Test Cases Section */}
           <div className="p-6">
