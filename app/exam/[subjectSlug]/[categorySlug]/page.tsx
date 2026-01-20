@@ -32,6 +32,10 @@ import type { HistoryItem } from '@/lib/store/slices/questionsSlice';
 import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { usePyodide } from '@/hooks/usePyodide';
 import { useRemoteExecution } from '@/hooks/useRemoteExecution';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 const examTitles: Record<string, string> = {
   category1: '第1類：基本程式設計',
@@ -720,61 +724,14 @@ export default function ExamPage({ params }: { params: Promise<{ subjectSlug: st
                     </div>
                     <div className="p-6 overflow-y-auto custom-scrollbar">
                         <div className="space-y-4 text-sm font-light">
-                            {hint.split('\n').map((line, i) => {
-                            const trimmed = line.trim();
-                            // Parse inline markdown
-                            const parseInline = (text: string) => {
-                                const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/);
-                                return parts.map((part, j) => {
-                                if (part.startsWith('`') && part.endsWith('`')) {
-                                    return (
-                                    <code key={j} className="px-1.5 py-0.5 mx-0.5 rounded bg-slate-800 text-amber-300 font-mono text-xs border border-slate-700">
-                                        {part.slice(1, -1)}
-                                    </code>
-                                    );
-                                }
-                                if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <strong key={j} className="text-amber-200 font-bold">{part.slice(2, -2)}</strong>;
-                                }
-                                return <span key={j}>{part}</span>;
-                                });
-                            };
-                            
-                            if (trimmed.startsWith('### ')) {
-                                return (
-                                <h3 key={i} className="text-base font-bold text-amber-400 mt-4 mb-2 flex items-center gap-2 font-mono uppercase">
-                                    <span className="text-amber-500/50">#</span> {parseInline(trimmed.replace(/^###\s+/, ''))}
-                                </h3>
-                                );
-                            }
-                            
-                            if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
-                                return (
-                                <div key={i} className="flex gap-3 text-slate-300 pl-1">
-                                    <span className="text-amber-500/50 mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500/50 shrink-0" />
-                                    <span className="leading-relaxed">{parseInline(trimmed.replace(/^[\*\-]\s+/, ''))}</span>
-                                </div>
-                                );
-                            }
-        
-                            if (/^\d+\.\s/.test(trimmed)) {
-                                const num = trimmed.match(/^\d+\./)?.[0];
-                                return (
-                                <div key={i} className="flex gap-2 text-slate-300 pl-1">
-                                    <span className="text-amber-500 font-mono text-xs mt-0.5 min-w-[1.5rem]">{num}</span>
-                                    <span className="leading-relaxed">{parseInline(trimmed.replace(/^\d+\.\s/, ''))}</span>
-                                </div>
-                                );
-                            }
-                            
-                            if (!trimmed) return <div key={i} className="h-2" />;
-        
-                            return (
-                                <p key={i} className="text-slate-300 leading-relaxed">
-                                {parseInline(line)}
-                                </p>
-                            );
-                            })}
+                            <div className="prose prose-invert prose-amber max-w-none leading-loose tracking-wider prose-headings:mb-4 prose-headings:mt-8 prose-li:my-2 prose-ul:list-disc prose-ul:pl-6 prose-p:my-4 text-base">
+                                <ReactMarkdown 
+                                    remarkPlugins={[remarkGfm]} 
+                                    rehypePlugins={[rehypeHighlight]}
+                                >
+                                    {hint}
+                                </ReactMarkdown>
+                            </div>
                         </div>
                         <div className="mt-8 pt-4 border-t border-slate-800 text-center">
                             <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Analysis Completed</p>

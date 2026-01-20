@@ -1,5 +1,9 @@
 import { Sparkles, Hash } from 'lucide-react';
 import { Question, Tag } from '@/lib/store/slices/questionsSlice';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 interface QuestionPanelProps {
   question: Question | null;
@@ -86,10 +90,16 @@ export function QuestionPanel({ question, loading }: QuestionPanelProps) {
         </div>
         
         <h2 className="text-3xl font-bold text-white leading-tight tracking-tight">{question.title}</h2>
-        <div className="prose prose-invert prose-slate max-w-none">
-          <p className="text-slate-300 text-base leading-relaxed whitespace-pre-wrap">{question.description}</p>
+        <div className="prose prose-invert prose-slate max-w-none prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-slate-700/50">
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]} 
+            rehypePlugins={[rehypeHighlight]}
+          >
+            {question.description}
+          </ReactMarkdown>
         </div>
       </div>
+
 
       <div className="space-y-4">
         <div className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl hover:shadow-2xl hover:shadow-cyan-900/10 transition-all duration-300">
