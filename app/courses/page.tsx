@@ -1,63 +1,49 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Trophy, Target, LayoutDashboard, Terminal } from 'lucide-react';
 import { getSubjects } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { setUser, logout } from '@/lib/store/slices/userSlice';
 import { setSubjects, setLoading, fetchAllStats } from '@/lib/store/slices/subjectsSlice';
 import { ProgressStats } from '@/components/ProgressStats';
 import { Footer } from '@/components/landing/Footer';
-import { CyberpunkBackground } from '@/components/CyberpunkBackground'; // Import Footer
+import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { AppNavbar } from '@/components/AppNavbar';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function CoursesPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  
-  const user = useAppSelector((state) => state.user.profile);
+  const { user, checkAuth, logout } = useAuth();
   const { subjects, loading, stats } = useAppSelector((state) => state.subjects);
-
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    // Cookie is handled by browser, just try to fetch profile
-    if (!user) {
-        // Use relative path to leverage Next.js Proxy (fixes CORS & cookie issues)
-        fetch('/api/users/profile', {
-        credentials: 'include',
-        })
-        .then((res) => {
-            if (res.ok) return res.json();
-            throw new Error('Unauthorized');
-        })
-        .then((data) => dispatch(setUser(data)))
-        .catch(async () => {
-            // Fix: Infinite redirect loop.
-            // If backend returns 401 but middleware sees cookie, we loop.
-            // must manually clear cookie by calling backend logout.
-            dispatch(logout());
-            await fetch('/api/auth/logout', { method: 'POST' });
-            router.push('/login');
-        });
-    }
+    // Only initialize once to prevent infinite loops
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
-    // Fetch subjects
-    if (subjects.length === 0) {
-        dispatch(setLoading(true));
-    }
-    
-    getSubjects()
-      .then((data) => dispatch(setSubjects(data)))
-      .catch(console.error)
-      .finally(() => dispatch(setLoading(false)));
+    // Check authentication
+    checkAuth().then((isValid) => {
+      if (!isValid) {
+        router.replace('/login');
+        return;
+      }
 
-    // Fetch stats
-    dispatch(fetchAllStats());
+      // Fetch subjects and stats only after successful auth
+      dispatch(setLoading(true));
+      getSubjects()
+        .then((data) => dispatch(setSubjects(data)))
+        .catch(console.error)
+        .finally(() => dispatch(setLoading(false)));
 
-  }, [router, dispatch, user, subjects.length]);
+      dispatch(fetchAllStats());
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount to prevent infinite loops
 
   const overallStats = useMemo(() => {
     if (!stats || stats.length === 0) return null;

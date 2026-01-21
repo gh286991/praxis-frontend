@@ -9,15 +9,24 @@ import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { Footer } from '@/components/landing/Footer';
 import { PraxisLogo } from '@/components/PraxisLogo';
 import { TerminalWindow } from '@/components/TerminalWindow';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, login } = useAuth();
   const [email, setEmail] = useState('dev@example.com');
   const [password, setPassword] = useState('123456');
   const [loading, setLoading] = useState(false);
   const [typedText, setTypedText] = useState('');
   
   const fullText = '> login --mode interactive';
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.replace('/courses');
+    }
+  }, [user, router]);
 
   // Typing animation effect
   useEffect(() => {
@@ -42,26 +51,17 @@ export default function LoginPage() {
   const handleDevLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      const res = await fetch('/api/auth/dev/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-      
-      if (res.ok) {
-        // Cookie is set by backend, just redirect
-        router.push('/courses');
-      } else {
-        alert('Login failed');
-      }
-    } catch (error) {
-      console.error('Login error', error);
-      alert('Connection error');
-    } finally {
-      setLoading(false);
+    
+    const result = await login(email, password);
+    
+    if (result.success) {
+      // Use replace to prevent back button issues
+      router.replace('/courses');
+    } else {
+      alert(result.error || 'Login failed');
     }
+    
+    setLoading(false);
   };
 
   return (
