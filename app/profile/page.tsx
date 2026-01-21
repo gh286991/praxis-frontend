@@ -47,7 +47,8 @@ export default function ProfilePage() {
   const loadProfile = async () => {
     try {
       // Use credentials: 'include' to pass HttpOnly cookies
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api'}/users/profile`, {
+      // Use relative path to leverage Next.js Proxy
+      const response = await fetch('/api/users/profile', {
         credentials: 'include',
       });
       const data = await response.json();

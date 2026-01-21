@@ -25,7 +25,8 @@ export default function CoursesPage() {
   useEffect(() => {
     // Cookie is handled by browser, just try to fetch profile
     if (!user) {
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/users/profile`, {
+        // Use relative path to leverage Next.js Proxy (fixes CORS & cookie issues)
+        fetch('/api/users/profile', {
         credentials: 'include',
         })
         .then((res) => {

@@ -35,14 +35,15 @@ export default function LoginPage() {
   }, []);
 
   const handleGoogleLogin = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/auth/google`;
+    // Go through Next.js Proxy
+    window.location.href = '/api/auth/google';
   };
 
   const handleDevLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/auth/dev/login`, {
+      const res = await fetch('/api/auth/dev/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

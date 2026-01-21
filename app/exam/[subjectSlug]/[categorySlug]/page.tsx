@@ -14,7 +14,13 @@ async function getData(categorySlug: string) {
     'Content-Type': 'application/json',
     'Cookie': `jwt_token=${token}`
   };
-  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api';
+  /* 
+    SSR Data Fetching Strategy:
+    1. Try BACKEND_INTERNAL_URL (Best for Docker/Zeabur internal networking, e.g. http://backend:3001/api)
+    2. Try NEXT_PUBLIC_BACKEND_URL (Public URL, might loopback via internet)
+    3. Fallback to localhost (Only works for local dev)
+  */
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api';
 
   try {
     // 1. Fetch User
