@@ -298,8 +298,7 @@ export function ExamContent({ subjectSlug, categorySlug, initialUser, initialHis
       // Force generation to skip database check if desired, or if we want streaming we always force? 
       // The previous code passed `true` (force). Streaming endpoint supports force param.
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/questions/stream?category=${examId}&force=true`, {
-          // Cookies are automatically sent with same-origin requests, but for cross-origin or to be safe:
+      const response = await fetch(`/api/questions/stream?category=${examId}&force=true`, {
           credentials: 'include',
       });
 
@@ -477,7 +476,7 @@ export function ExamContent({ subjectSlug, categorySlug, initialUser, initialHis
 
   const handleLogout = async () => {
     try {
-        await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/auth/logout`, {
+        await fetch('/api/auth/logout', {
             method: 'POST',
             credentials: 'include'
         });
