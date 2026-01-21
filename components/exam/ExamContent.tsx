@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getNextQuestion, submitAnswer, getHint, getHistory, getQuestionById } from '@/lib/api';
+import { submitAnswer, getHint, getHistory, getQuestionById } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setUser, logout } from '@/lib/store/slices/userSlice';
 import {
@@ -52,12 +52,9 @@ const examTitles: Record<string, string> = {
 interface ExamContentProps {
   subjectSlug: string;
   categorySlug: string;
-  initialUser?: any; // Should ideally be typed
-  initialHistory?: any[];
-  initialQuestion?: any;
 }
 
-export function ExamContent({ subjectSlug, categorySlug, initialUser, initialHistory, initialQuestion }: ExamContentProps) {
+export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   
@@ -81,15 +78,11 @@ export function ExamContent({ subjectSlug, categorySlug, initialUser, initialHis
   const { 
       runCode: runLocalCode, 
       output: localOutput, 
-      isLoading: isLocalLoading 
   } = usePyodide();
 
-  // Hook 2: Remote Execution for "Submit" (Streaming)
   const { 
       submitCodeWithStream, 
-      systemMessages,      // For Modal display
-      executionOutput,     // For Console (not used for Submit, only for Run)
-      isLoading: isRemoteLoading 
+      systemMessages,
   } = useRemoteExecution();
 
   // State for Submission Progress Modal
@@ -214,31 +207,37 @@ export function ExamContent({ subjectSlug, categorySlug, initialUser, initialHis
     }
   };
 
-  // Initialize Data (SSR Hydration)
+  // CSR: Check auth and fetch data on mount
   useEffect(() => {
-    // 1. Hydrate User
-    if (initialUser) {
-      dispatch(setUser(initialUser));
-    }
-
-    // 2. Hydrate History
-    if (initialHistory) {
-      dispatch(setHistory(initialHistory));
-    } else if (initialUser) {
-      // If no initial history but we have user (e.g. client nav?), try fetch
-      fetchHistoryData();
-    }
-
-    // 3. Hydrate Question
-    if (initialQuestion) {
-        dispatch(setCurrentQuestion(initialQuestion));
-    }
+    const initializeData = async () => {
+      try {
+        // 1. Check authentication
+        const profileRes = await fetch('/api/users/profile', { credentials: 'include' });
+        
+        if (!profileRes.ok) {
+          router.replace('/login');
+          return;
+        }
+        
+        const userData = await profileRes.json();
+        dispatch(setUser(userData));
+        
+        // 2. Fetch history
+        fetchHistoryData();
+        
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        router.replace('/login');
+      }
+    };
+    
+    initializeData();
       
     // Cleanup on unmount
     return () => {
        dispatch(resetQuestion());
     };
-  }, [dispatch, initialUser, initialHistory, initialQuestion, fetchHistoryData]);
+  }, [dispatch, router, fetchHistoryData]);
 
   // Layout resizing logic
   useEffect(() => {
