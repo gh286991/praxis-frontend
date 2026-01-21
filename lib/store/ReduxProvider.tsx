@@ -10,9 +10,8 @@ function AuthSync({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) {
-       // Use credentials: 'include' to send cookies
-       // Added /api prefix to match consistency with ProfilePage and apiClient
-       fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api'}/users/profile`, {
+       // Use relative path to go through Next.js proxy for proper cookie handling
+       fetch('/api/users/profile', {
         credentials: 'include',
       })
         .then((res) => {

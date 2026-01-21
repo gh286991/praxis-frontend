@@ -1,8 +1,9 @@
 import axios, { AxiosInstance } from 'axios';
 
 // Create axios instance with base configuration
+// Use relative path to go through Next.js proxy for proper cookie handling in production
 const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
