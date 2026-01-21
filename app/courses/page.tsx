@@ -34,8 +34,12 @@ export default function CoursesPage() {
             throw new Error('Unauthorized');
         })
         .then((data) => dispatch(setUser(data)))
-        .catch(() => {
+        .catch(async () => {
+            // Fix: Infinite redirect loop.
+            // If backend returns 401 but middleware sees cookie, we loop.
+            // must manually clear cookie by calling backend logout.
             dispatch(logout());
+            await fetch('/api/auth/logout', { method: 'POST' });
             router.push('/login');
         });
     }

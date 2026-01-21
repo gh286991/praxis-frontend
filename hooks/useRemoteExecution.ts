@@ -47,11 +47,9 @@ export function useRemoteExecution(): UseRemoteExecutionReturn {
             'Content-Type': 'application/json',
         };
 
-        // Use proxy if relative, or direct backend URL if specified
-        // Note: We use relative '/api' default to leverage Next.js rewrites for same-origin cookies if desired,
-        // but if NEXT_PUBLIC_BACKEND_URL is set (e.g. localhost:3001), exact path logic applies.
-        // Given current setup: defaults to http://localhost:3001/api
-        const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api';
+        // Use proxy with relative path '/api' to leverage Next.js rewrites
+        // This ensures cookies are handled correctly and we don't need client-side env vars
+        const baseUrl = '/api';
         
         const response = await fetch(`${baseUrl}${endpoint}`, {
             method: 'POST',
