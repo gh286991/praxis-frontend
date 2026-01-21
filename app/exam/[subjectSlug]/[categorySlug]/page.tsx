@@ -23,7 +23,7 @@ async function getData(categorySlug: string) {
   const baseUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api';
 
   try {
-    // 1. Fetch User
+    // 1. Fetch User first (required for auth)
     const userRes = await fetch(`${baseUrl}/users/profile`, { headers, cache: 'no-store' });
     
     if (userRes.status === 401) {
@@ -32,17 +32,17 @@ async function getData(categorySlug: string) {
     
     const user = userRes.ok ? await userRes.json() : null;
 
-    // 2. Fetch History
-    let history = [];
-    if (user) {
-        const historyRes = await fetch(`${baseUrl}/questions/history/${categorySlug}`, { headers, cache: 'no-store' });
-        if (historyRes.ok) history = await historyRes.json();
-    }
-
-    // 3. Fetch Next Question
+    // 2. Fetch History and Question in PARALLEL for faster SSR
+    let history: any[] = [];
     let question = null;
+    
     if (user) {
-        const qRes = await fetch(`${baseUrl}/questions/next/${categorySlug}?force=false`, { headers, cache: 'no-store' });
+        const [historyRes, qRes] = await Promise.all([
+            fetch(`${baseUrl}/questions/history/${categorySlug}`, { headers, cache: 'no-store' }),
+            fetch(`${baseUrl}/questions/next/${categorySlug}?force=false`, { headers, cache: 'no-store' }),
+        ]);
+        
+        if (historyRes.ok) history = await historyRes.json();
         if (qRes.ok) question = await qRes.json();
     }
     
