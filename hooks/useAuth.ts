@@ -9,7 +9,11 @@ export function useAuth() {
   const hasCheckedAuth = useRef(false);
 
   const checkAuth = useCallback(async () => {
-    if (hasCheckedAuth.current) return;
+    // If already checked, return current auth state from Redux
+    // This prevents returning undefined when called multiple times
+    if (hasCheckedAuth.current) {
+      return isAuthenticated;
+    }
     hasCheckedAuth.current = true;
 
     try {
@@ -32,7 +36,7 @@ export function useAuth() {
       return false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]); // logout is defined below, so we disable the warning
+  }, [dispatch, isAuthenticated]); // logout is defined below, so we disable the warning
 
   /**
    * Logout user and clear all authentication state
