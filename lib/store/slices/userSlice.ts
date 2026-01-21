@@ -9,13 +9,11 @@ export interface UserProfile {
 interface UserState {
   profile: UserProfile | null;
   isAuthenticated: boolean;
-  token: string | null;
 }
 
 const initialState: UserState = {
   profile: null,
   isAuthenticated: false,
-  token: null,
 };
 
 const userSlice = createSlice({
@@ -26,16 +24,12 @@ const userSlice = createSlice({
       state.profile = action.payload;
       state.isAuthenticated = true;
     },
-    setToken: (state, action: PayloadAction<string>) => {
-      state.token = action.payload;
-    },
     logout: (state) => {
       state.profile = null;
       state.isAuthenticated = false;
-      state.token = null;
     },
   },
 });
 
-export const { setUser, setToken, logout } = userSlice.actions;
+export const { setUser, logout } = userSlice.actions;
 export default userSlice.reducer;

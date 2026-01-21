@@ -43,19 +43,21 @@ export function useRemoteExecution(): UseRemoteExecutionReturn {
     const isSubmission = endpoint.includes('submit');
     
     try {
-        const token = localStorage.getItem('jwt_token');
         const headers: HeadersInit = {
             'Content-Type': 'application/json',
         };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
 
+        // Use proxy if relative, or direct backend URL if specified
+        // Note: We use relative '/api' default to leverage Next.js rewrites for same-origin cookies if desired,
+        // but if NEXT_PUBLIC_BACKEND_URL is set (e.g. localhost:3001), exact path logic applies.
+        // Given current setup: defaults to http://localhost:3001/api
         const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api';
+        
         const response = await fetch(`${baseUrl}${endpoint}`, {
             method: 'POST',
             headers,
             body: JSON.stringify(body),
+            credentials: 'include', // <--- Critical: Send HttpOnly cookies
         });
 
         if (!response.ok) {

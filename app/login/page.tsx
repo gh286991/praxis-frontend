@@ -45,12 +45,12 @@ export default function LoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/auth/dev/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       
       if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('jwt_token', data.access_token);
+        // Cookie is set by backend, just redirect
         router.push('/courses');
       } else {
         alert('Login failed');
@@ -144,6 +144,7 @@ export default function LoginPage() {
                     </label>
                     <Input 
                       type="password" 
+                      placeholder="Password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="bg-slate-800/50 border-slate-700 text-slate-100 placeholder:text-slate-600 focus:border-cyan-500 focus:ring-cyan-500/20 h-11 font-mono text-sm rounded-lg"

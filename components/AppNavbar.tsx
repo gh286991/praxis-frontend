@@ -4,17 +4,27 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut } from 'lucide-react';
-import { useAppSelector } from '@/lib/store';
+import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
+import { logout } from '@/lib/store/slices/userSlice';
+
+import apiClient from '@/lib/apiClient';
 
 export function AppNavbar() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.user.profile);
 
-  const handleLogout = () => {
-    localStorage.removeItem('jwt_token');
-    // dispatch(logout()); // If you have a logout action
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      dispatch(logout());
+      // Always redirect to login even if API fails
+      router.push('/login');
+    }
   };
 
   return (
@@ -44,7 +54,7 @@ export function AppNavbar() {
                 <div className="flex items-center gap-3">
                   <Link
                     href="/profile"
-                    className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
+                    className="hover:opacity-80 transition-opacity group"
                   >
                     <Avatar className="h-9 w-9 border border-slate-700 group-hover:border-indigo-500 transition-all ring-2 ring-transparent group-hover:ring-indigo-500/20">
                       <AvatarImage src={user.picture} alt={user.name} />
@@ -52,27 +62,27 @@ export function AppNavbar() {
                         {user.name?.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="hidden md:block text-left">
-                      <Link
-                          href="/courses"
-                          className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
-                      >
-                          COURSES
-                      </Link>
-                      <Link
-                          href="/subscription"
-                          className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
-                      >
-                          SUBSCRIPTION
-                      </Link>
-                      <Link
-                          href="/profile"
-                          className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
-                      >
-                          PROFILE
-                      </Link>
-                    </div>
                   </Link>
+                  <div className="hidden md:block text-left">
+                    <Link
+                        href="/courses"
+                        className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                    >
+                        COURSES
+                    </Link>
+                    <Link
+                        href="/subscription"
+                        className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                    >
+                        SUBSCRIPTION
+                    </Link>
+                    <Link
+                        href="/profile"
+                        className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                    >
+                        PROFILE
+                    </Link>
+                  </div>
                 </div>
                 <div className="h-6 w-px bg-slate-700 mx-2" />
                 <Button

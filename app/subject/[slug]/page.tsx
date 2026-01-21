@@ -19,11 +19,7 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ slug: 
   const { currentSubject: subject, categories, loading, currentSubjectStats } = useAppSelector((state) => state.subjects);
 
   useEffect(() => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
+    // Token check removed - relying on HttpOnly cookies and middleware
     
     // Set loading true initially if no subject or slug changed
     if (!subject || subject.slug !== slug) {

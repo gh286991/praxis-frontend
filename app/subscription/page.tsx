@@ -40,14 +40,8 @@ export default function SubscriptionPage() {
   const [stats, setStats] = useState<UsageStats | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
     fetchUsageStats();
-  }, [router]);
+  }, []);
 
   const fetchUsageStats = async () => {
     try {

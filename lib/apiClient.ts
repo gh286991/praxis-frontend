@@ -6,25 +6,10 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Enable cookies for cross-site requests
 });
 
-// Add request interceptor to automatically include JWT token
-apiClient.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-    
-    // Add token to headers if it exists
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// Request interceptor removed as cookies are handled by browser automatically
 
 // Add response interceptor for error handling
 apiClient.interceptors.response.use(
@@ -32,12 +17,10 @@ apiClient.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized errors (token expired or invalid)
     if (error.response?.status === 401) {
-      // Clear invalid token
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('jwt_token');
+      // Token is invalid/expired (handled by cookie), redirect to login
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+         window.location.href = '/login';
       }
-      // Optionally redirect to login
-      // window.location.href = '/login';
     }
     
     return Promise.reject(error);

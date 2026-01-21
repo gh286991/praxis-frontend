@@ -23,18 +23,10 @@ export default function CoursesPage() {
 
 
   useEffect(() => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    // Fetch user profile if not present
+    // Cookie is handled by browser, just try to fetch profile
     if (!user) {
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/users/profile`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include',
         })
         .then((res) => {
             if (res.ok) return res.json();
@@ -42,7 +34,6 @@ export default function CoursesPage() {
         })
         .then((data) => dispatch(setUser(data)))
         .catch(() => {
-            localStorage.removeItem('jwt_token');
             dispatch(logout());
             router.push('/login');
         });
@@ -190,7 +181,13 @@ export default function CoursesPage() {
                           <span>{subject.language}</span>
                         </div>
                       </div>
-                      <Button className="w-full bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 text-slate-300 hover:text-white transition-all duration-300 group/btn">
+                      <Button 
+                        className="w-full bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 text-slate-300 hover:text-white transition-all duration-300 group/btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectSubject(subject.slug);
+                        }}
+                      >
                         <span className="mr-2 text-xs font-bold tracking-widest">ACCESS MODULE</span>
                         <ArrowRight className="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
                       </Button>

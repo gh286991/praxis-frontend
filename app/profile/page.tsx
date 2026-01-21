@@ -46,10 +46,9 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
+      // Use credentials: 'include' to pass HttpOnly cookies
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api'}/users/profile`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('jwt_token')}`,
-        },
+        credentials: 'include',
       });
       const data = await response.json();
       setProfileData(data);

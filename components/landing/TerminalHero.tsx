@@ -179,19 +179,8 @@ export function TerminalHero({ initialStats }: TerminalHeroProps) {
 
     switch (command) {
       case 'start': {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-        if (token) {
           setTerminalLines((prev) => [...prev, '> 正在載入儀表板...']);
           setTimeout(() => router.push('/courses'), 800);
-        } else {
-          setTerminalLines((prev) => [
-            ...prev,
-            '',
-            '⚠️  您尚未登入',
-            '請先輸入 login 登入您的帳號，或使用 Google 快速登入。',
-            '',
-          ]);
-        }
         break;
       }
       case 'login':
