@@ -19,12 +19,22 @@ vi.mock('@/components/TerminalWindow', () => ({ TerminalWindow: ({ children }: a
 vi.mock('@/components/landing/Footer', () => ({ Footer: () => <div>MockFooter</div> }));
 vi.mock('@/components/CyberpunkBackground', () => ({ CyberpunkBackground: () => <div>MockBg</div> }));
 
+// Mock useAuth
+const mockLogin = vi.fn();
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: null,
+    login: mockLogin.mockResolvedValue({ success: true }),
+  }),
+}));
+
 // Mock fetch
 global.fetch = vi.fn();
 
 describe('LoginPage', () => {
   const mockRouter = {
     push: vi.fn(),
+    replace: vi.fn(),
   };
 
   beforeEach(() => {
@@ -59,18 +69,12 @@ describe('LoginPage', () => {
     const submitButton = screen.getByRole('button', { name: /GRANT ACCESS/i });
     fireEvent.click(submitButton);
 
-    await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-            expect.stringContaining('/auth/dev/login'),
-            expect.objectContaining({
-                method: 'POST',
-                credentials: 'include', // Verify this important flag
-                body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
-            })
-        );
-    });
-
+    // Verify login was called
+    expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123');
+    
     // Verify redirect
-    expect(mockRouter.push).toHaveBeenCalledWith('/courses');
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith('/courses');
+    });
   });
 });

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { ExamContent } from '@/components/exam/ExamContent';
+import { getHistory } from '@/lib/api';
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -204,9 +205,9 @@ describe('ExamContent', () => {
     return render(<ExamContent subjectSlug="python-basic" categorySlug="category1" {...props} />);
   };
 
-  describe('hydration', () => {
-    it('should hydrate user from props', async () => {
-      renderContent({ initialUser: mockUser });
+  describe('data fetching', () => {
+    it('should fetch user profile on mount', async () => {
+      renderContent();
       
       await waitFor(() => {
         expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({ 
@@ -216,9 +217,11 @@ describe('ExamContent', () => {
       });
     });
 
-    it('should hydrate history from props', async () => {
+    it('should fetch history on mount', async () => {
         const mockHistory = [{ questionId: '1', isCorrect: true }];
-        renderContent({ initialHistory: mockHistory });
+        (getHistory as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(mockHistory);
+        
+        renderContent();
         
         await waitFor(() => {
             expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({ 

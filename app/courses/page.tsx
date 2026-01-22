@@ -29,7 +29,7 @@ export default function CoursesPage() {
     // Check authentication
     checkAuth().then((isValid) => {
       if (!isValid) {
-        router.replace('/login');
+        router.push('/login');
         return;
       }
 
