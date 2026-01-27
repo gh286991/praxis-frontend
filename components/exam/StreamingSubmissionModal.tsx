@@ -324,17 +324,17 @@ export function StreamingSubmissionModal({
                   {/* Visible during running (optional) or completed */}
                   {/* User wants to see "real code" from start. So we show Input always if available */}
                   <div className={`p-4 grid grid-cols-2 gap-4 text-xs font-mono transition-all duration-500 ${
-                    testCase.status === 'pending' ? 'opacity-50 grayscale blur-[0.5px]' : 'opacity-100 grayscale-0 blur-0'
+                    testCase.status === 'pending' ? 'opacity-50 grayscale' : 'opacity-100 grayscale-0'
                   }`}>
                       <div>
                         <div className="text-slate-500 mb-1">Input:</div>
-                        <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre-wrap max-h-24 custom-scrollbar">
+                        <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre max-h-24 custom-scrollbar">
                           {testCase.input || <span className="text-slate-600 italic">No input</span>}
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-500 mb-1">Expected:</div>
-                        <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre-wrap max-h-24 custom-scrollbar">
+                        <div className="bg-slate-900 p-2 rounded text-slate-300 border border-slate-800/50 overflow-x-auto whitespace-pre max-h-24 custom-scrollbar">
                            {testCase.expected || <span className="text-slate-600 italic">Hidden</span>}
                         </div>
                       </div>
@@ -345,7 +345,7 @@ export function StreamingSubmissionModal({
                              <div className={`${testCase.status === 'failed' ? 'text-rose-400/80' : 'text-emerald-400/80'} mb-1`}>
                                 Actual Output:
                              </div>
-                             <div className={`p-2 rounded border overflow-x-auto whitespace-pre-wrap ${
+                             <div className={`p-2 rounded border overflow-x-auto whitespace-pre ${
                                  testCase.status === 'failed' 
                                  ? 'bg-rose-950/10 text-rose-300 border-rose-500/20' 
                                  : 'bg-emerald-950/10 text-emerald-300 border-emerald-500/20'
