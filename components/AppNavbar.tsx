@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,7 +7,7 @@ import { LogOut } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { logout } from '@/lib/store/slices/userSlice';
-import { ImportModal } from '@/components/admin/ImportModal';
+
 
 import apiClient from '@/lib/apiClient';
 
@@ -29,7 +28,7 @@ export function AppNavbar() {
     }
   };
 
-  const [isImportOpen, setIsImportOpen] = useState(false);
+
 
   return (
     <>
@@ -69,14 +68,7 @@ export function AppNavbar() {
                     </Avatar>
                   </Link>
                   <div className="hidden md:flex items-center gap-1 text-left">
-                    <Button 
-                         variant="ghost" 
-                         size="sm"
-                         onClick={() => setIsImportOpen(true)}
-                         className="text-slate-400 hover:text-cyan-400 hover:bg-slate-800/50 font-mono text-xs"
-                    >
-                         IMPORT
-                    </Button>
+
                     <div className="h-4 w-px bg-slate-800 mx-2" />
                     <Link
                         href="/courses"
@@ -114,7 +106,7 @@ export function AppNavbar() {
       </div>
     </header>
     
-    <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
+
     </>
   );
 }
