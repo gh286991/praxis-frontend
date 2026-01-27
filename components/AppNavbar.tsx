@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -7,6 +8,7 @@ import { LogOut } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { logout } from '@/lib/store/slices/userSlice';
+import { ImportModal } from '@/components/admin/ImportModal';
 
 import apiClient from '@/lib/apiClient';
 
@@ -27,7 +29,10 @@ export function AppNavbar() {
     }
   };
 
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
   return (
+    <>
     <header className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
@@ -63,22 +68,31 @@ export function AppNavbar() {
                       </AvatarFallback>
                     </Avatar>
                   </Link>
-                  <div className="hidden md:block text-left">
+                  <div className="hidden md:flex items-center gap-1 text-left">
+                    <Button 
+                         variant="ghost" 
+                         size="sm"
+                         onClick={() => setIsImportOpen(true)}
+                         className="text-slate-400 hover:text-cyan-400 hover:bg-slate-800/50 font-mono text-xs"
+                    >
+                         IMPORT
+                    </Button>
+                    <div className="h-4 w-px bg-slate-800 mx-2" />
                     <Link
                         href="/courses"
-                        className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                        className="px-3 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
                     >
                         COURSES
                     </Link>
                     <Link
                         href="/subscription"
-                        className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                        className="px-3 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
                     >
                         SUBSCRIPTION
                     </Link>
                     <Link
                         href="/profile"
-                        className="px-4 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
+                        className="px-3 py-2 text-sm font-mono hover:text-cyan-400 hover:bg-slate-800/50 rounded transition-colors"
                     >
                         PROFILE
                     </Link>
@@ -99,5 +113,8 @@ export function AppNavbar() {
         </div>
       </div>
     </header>
+    
+    <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
+    </>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { submitAnswer, getHint, getHistory, getQuestionById } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
@@ -21,6 +21,7 @@ import {
   setSubmissionResult,
 } from '@/lib/store/slices/questionsSlice';
 import { QuestionPanel } from '@/components/exam/QuestionPanel';
+import { QuestionList } from '@/components/exam/QuestionList';
 import { EditorPanel } from '@/components/exam/EditorPanel';
 import { ConsolePanel } from '@/components/exam/ConsolePanel';
 import { StreamingSubmissionModal } from '@/components/exam/StreamingSubmissionModal';
@@ -156,18 +157,31 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
       for (const sample of samplesToRun) {
           // Parse sample input for file content (format: "filename: content")
           let currentInput = sample.input || '';
-          const currentFileAssets = { ...(question?.fileAssets || {}) };
           
-          // Check if input follows "filename: content" pattern for file I/O
-          if (question?.fileAssets) {
-            for (const fileName of Object.keys(question.fileAssets)) {
-              if (currentInput.startsWith(fileName + ':')) {
-                const fileContent = currentInput.substring(fileName.length + 1);
-                currentFileAssets[fileName] = fileContent;
-                currentInput = ''; // Clear stdin since it's file content, not stdin input
-                break;
+          // Priority 1: Use sample's own fileAssets if available
+          // Priority 2: Use question's global fileAssets as fallback
+          // Priority 3: Parse input string for file definition (legacy support)
+          let currentFileAssets = { ...(question?.fileAssets || {}) };
+          
+          if (sample.fileAssets && Object.keys(sample.fileAssets).length > 0) {
+              // Sample has its own fileAssets, use them (merge with question's global ones)
+              currentFileAssets = { ...currentFileAssets, ...sample.fileAssets };
+          } else {
+              // Check if input follows "filename: content" pattern for file I/O
+              // We support this even if fileAssets is empty, to allow questions to define dynamic file inputs in samples
+              // regex notes: use [\s\S] to match newlines instead of /s flag for older ES compatibility if needed
+              const fileInputMatch = currentInput.match(/^([a-zA-Z0-9_\-\.]+):\s*([\s\S]*)/);
+              if (fileInputMatch) {
+                 const fileName = fileInputMatch[1];
+                 const fileContent = fileInputMatch[2];
+                 
+                 // Check if this looks like a file definition we should respect
+                 // Simple heuristic: if the filename has an extension txt/csv/json/py
+                 if (fileName.match(/\.(txt|csv|json|py|dat)$/i)) {
+                     currentFileAssets[fileName] = fileContent;
+                     currentInput = ''; // Clear stdin since it's file content
+                 }
               }
-            }
           }
           
           // Use Local Pyodide with dynamically updated fileAssets
@@ -238,6 +252,35 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
        dispatch(resetQuestion());
     };
   }, [dispatch, router, fetchHistoryData]);
+
+  // Load question from URL param 'q' if present (Mock Exam Navigation)
+  const searchParams = useSearchParams();
+  const qId = searchParams.get('q');
+
+  useEffect(() => {
+      if (qId && (!question || question._id !== qId)) {
+          const loadSpecificQuestion = async () => {
+              dispatch(setLoading(true));
+              try {
+                  const q = await getQuestionById(qId);
+                  dispatch(setCurrentQuestion(q));
+                  // Reset state for new question
+                  dispatch(setCode(q.referenceCode || '# write your code here\n'));
+                  dispatch(setOutput(''));
+                  dispatch(setHint(null));
+                  dispatch(setIsHintOpen(false));
+                  dispatch(setIsCompleted(false));
+                  setRunResults([]);
+                  setIsPassed(undefined);
+              } catch (e) {
+                  console.error('Failed to load specific question:', e);
+              } finally {
+                  dispatch(setLoading(false));
+              }
+          };
+          loadSpecificQuestion();
+      }
+  }, [qId, question, dispatch]);
 
   // Layout resizing logic
   useEffect(() => {
@@ -505,14 +548,14 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
         />
       )}
 
-      {/* Left Sidebar - History */}
+      {/* Left Sidebar - Navigation & History */}
       <div className={`fixed top-0 left-0 h-full w-80 bg-slate-900/95 backdrop-blur-xl border-r border-slate-700/50 z-50 transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2 text-indigo-300">
-              <History className="w-5 h-5" />
-              <span className="font-bold">Session History</span>
+              <Menu className="w-5 h-5" />
+              <span className="font-bold">Exam Navigation</span>
             </div>
             <Button
               variant="ghost"
@@ -524,36 +567,57 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
             </Button>
           </div>
           
-          {/* History List */}
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          {history.length === 0 ? (
-            <div className="text-center text-slate-500 mt-8 text-xs uppercase tracking-wider">No Records Found</div>
-          ) : (
-            history.map((item) => (
-              <button
-                key={item.questionId}
-                onClick={() => handleLoadHistoryQuestion(item)}
-                className={`w-full mb-2 p-3 rounded-lg border transition-all flex items-center gap-3 group hover:scale-[1.02] ${
-                  question?._id === item.questionId
-                    ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
-                    : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600'
-                }`}
-              >
-                <div className={`mt-0.5 ${item.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}>
-                   {item.isCorrect ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="font-bold text-slate-200 truncate group-hover:text-white transition-colors text-xs font-mono">
-                    {item.title}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-1 font-mono">
-                    {new Date(item.attemptedAt).toLocaleTimeString()}
-                  </div>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
+          {/* Question List (Top Part) */}
+          <div className="flex-1 min-h-0 border-b border-slate-700/50">
+             <QuestionList 
+                categorySlug={categorySlug}
+                currentQuestionId={question?._id}
+                className="w-full h-full border-none bg-transparent"
+                onSelectQuestion={(id) => {
+                    router.push(`/exam/${subjectSlug}/${categorySlug}?q=${id}`);
+                    // Optional: Close sidebar on selection on mobile, but maybe keep open on desktop?
+                    // User didn't specify, but for "hamburger menu" usually it closes or stays.
+                    // Let's keep it open for navigation unless screen is small.
+                }}
+            />
+          </div>
+
+          {/* Session History (Bottom Part) */}
+          <div className="h-1/3 flex flex-col min-h-[200px] bg-slate-900/50">
+            <div className="px-4 py-2 border-b border-slate-700/50 flex items-center gap-2 text-slate-400">
+               <History className="w-4 h-4" />
+               <span className="text-xs font-bold uppercase tracking-wider">Session History</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            {history.length === 0 ? (
+                <div className="text-center text-slate-500 mt-4 text-xs uppercase tracking-wider">No Records</div>
+            ) : (
+                history.map((item) => (
+                <button
+                    key={item.questionId}
+                    onClick={() => handleLoadHistoryQuestion(item)}
+                    className={`w-full mb-2 p-3 rounded-lg border transition-all flex items-center gap-3 group hover:scale-[1.02] ${
+                    question?._id === item.questionId
+                        ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
+                        : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600'
+                    }`}
+                >
+                    <div className={`mt-0.5 ${item.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {item.isCorrect ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                    <div className="font-bold text-slate-200 truncate group-hover:text-white transition-colors text-xs font-mono">
+                        {item.title}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-1 font-mono">
+                        {new Date(item.attemptedAt).toLocaleTimeString()}
+                    </div>
+                    </div>
+                </button>
+                ))
+            )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -668,6 +732,7 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
         </header>
         
         <main ref={mainRef} className="flex-1 flex overflow-hidden relative">
+            
             {/* Left Panel: Question */}
             <div 
             className="flex flex-col border-r border-slate-700/50 bg-slate-900/30 backdrop-blur-sm relative z-10"

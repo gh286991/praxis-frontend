@@ -19,6 +19,9 @@ export interface Category {
   description: string;
   order: number;
   subjectId: string;
+  type: 'CHAPTER' | 'EXAM';
+  duration?: number;
+  passScore?: number;
 }
 
 export interface ProgressStats {

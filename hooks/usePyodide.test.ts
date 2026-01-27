@@ -87,7 +87,8 @@ describe('usePyodide', () => {
       (window as any).loadPyodide = vi.fn().mockResolvedValue(mockPyodide);
       
       // Trigger onload
-      if (capturedScript?.onload) {
+      // Trigger onload
+      if ((capturedScript as any)?.onload) {
         await act(async () => {
           await (capturedScript!.onload as Function)(new Event('load'));
         });
@@ -117,7 +118,8 @@ describe('usePyodide', () => {
       const { result } = renderHook(() => usePyodide());
       
       // Trigger onerror
-      if (capturedScript?.onerror) {
+      // Trigger onerror
+      if ((capturedScript as any)?.onerror) {
         await act(async () => {
           (capturedScript!.onerror as Function)(new Error('Failed to load'));
         });
@@ -153,7 +155,7 @@ describe('usePyodide', () => {
       // Set up window.loadPyodide to reject
       (window as any).loadPyodide = vi.fn().mockRejectedValue(new Error('Init failed'));
       
-      if (capturedScript?.onload) {
+      if ((capturedScript as any)?.onload) {
         await act(async () => {
           await (capturedScript!.onload as Function)(new Event('load'));
         });

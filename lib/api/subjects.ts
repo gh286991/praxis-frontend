@@ -21,6 +21,25 @@ export const subjectsApi = {
     const response = await apiClient.get(`/subjects/${slug}`);
     return response.data;
   },
+  /**
+   * Import mock exam
+   */
+  importMockExam: async (file: File, subjectId?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (subjectId) {
+      formData.append('subjectId', subjectId);
+    }
+    
+    // Note: The backend endpoint is currently at /import/mock-exam
+    // We should probably move it to /subjects/import or similar, but for now we use the existing one
+    const response = await apiClient.post('/import/mock-exam', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 /**

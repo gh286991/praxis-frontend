@@ -15,8 +15,8 @@ export interface Question {
   description: string;
   sampleInput: string;
   sampleOutput: string;
-  samples: { input: string; output: string; explanation?: string }[];
-  testCases: { input: string; output: string }[];
+  samples: { input: string; output: string; explanation?: string; fileAssets?: Record<string, string> }[];
+  testCases: { input: string; output: string; type?: string; description?: string; fileAssets?: Record<string, string> }[];
   tags: Tag[];
   difficulty?: 'easy' | 'medium' | 'hard';
   constraints?: string;
