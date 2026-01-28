@@ -12,16 +12,18 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { subjectsApi } from '@/lib/api';
 import { getCategoriesBySubject } from '@/lib/api';
-import { setCategories } from '@/lib/store/slices/subjectsSlice';
-import { type AppDispatch } from '@/lib/store';
 import React, { useRef, useState } from 'react';
+
+// Define Category interface since we're using it in the callback
+// Or import it if available. Using any[] for now as per previous signature or better strict type
+import { Category } from '@/lib/store/slices/subjectsSlice';
 
 interface ImportExamDialogProps {
   subjectId: string;
-  dispatch: AppDispatch;
+  onImportSuccess: (categories: Category[]) => void;
 }
 
-export function ImportExamDialog({ subjectId, dispatch }: ImportExamDialogProps) {
+export function ImportExamDialog({ subjectId, onImportSuccess }: ImportExamDialogProps) {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function ImportExamDialog({ subjectId, dispatch }: ImportExamDialogProps)
 
       // Refresh categories
       const categoriesData = await getCategoriesBySubject(subjectId);
-      dispatch(setCategories(categoriesData));
+      onImportSuccess(categoriesData);
       setIsImportOpen(false);
     } catch (error) {
       console.error(error);
