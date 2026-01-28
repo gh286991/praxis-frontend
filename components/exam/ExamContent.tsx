@@ -6,27 +6,6 @@ import Link from 'next/link';
 import { submitAnswer, getHint, getHistory, getQuestionById } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setUser, logout } from '@/lib/store/slices/userSlice';
-import {
-  setCurrentQuestion,
-  setHistory,
-  setCode,
-  setOutput,
-  setLoading,
-  setExecuting,
-  setHint,
-  setIsHintOpen,
-  setIsCompleted,
-  resetQuestion,
-  setSubmissionLoading,
-  setSubmissionResult,
-} from '@/lib/store/slices/questionsSlice';
-import { QuestionPanel } from '@/components/exam/QuestionPanel';
-import { QuestionList } from '@/components/exam/QuestionList';
-import { EditorPanel } from '@/components/exam/EditorPanel';
-import { ConsolePanel } from '@/components/exam/ConsolePanel';
-import { StreamingSubmissionModal } from '@/components/exam/StreamingSubmissionModal';
-import GenerationModal from '@/components/exam/GenerationModal';
-import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { HistoryItem } from '@/lib/store/slices/questionsSlice';
@@ -50,12 +29,47 @@ const examTitles: Record<string, string> = {
   category9: '第9類：檔案與異常處理',
 };
 
+import {
+  Question,
+  setCurrentQuestion,
+  setHistory,
+  setCode,
+  setOutput,
+  setLoading,
+  setExecuting,
+  setHint,
+  setIsHintOpen,
+  setIsCompleted,
+  setSubmissionLoading,
+  setSubmissionResult
+} from '@/lib/store/slices/questionsSlice';
+import { Subject, Category } from '@/lib/store/slices/subjectsSlice';
+import { UserProfile } from '@/lib/store/slices/userSlice';
+import { QuestionPanel } from '@/components/exam/QuestionPanel';
+import { QuestionList } from '@/components/exam/QuestionList';
+import { EditorPanel } from '@/components/exam/EditorPanel';
+import { ConsolePanel } from '@/components/exam/ConsolePanel';
+import { StreamingSubmissionModal } from '@/components/exam/StreamingSubmissionModal';
+import GenerationModal from '@/components/exam/GenerationModal';
+import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
+
 interface ExamContentProps {
   subjectSlug: string;
   categorySlug: string;
+  initialUser: UserProfile;
+  initialSubject: Subject;
+  initialCategory: Category | null;
+  initialQuestions: any[]; // Use proper type, currently QuestionSummary in QuestionList
+  initialCurrentQuestion: Question | null;
 }
 
-export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
+export function ExamContent({ 
+  subjectSlug, 
+  categorySlug, 
+  initialUser,
+  initialQuestions,
+  initialCurrentQuestion
+}: ExamContentProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   
@@ -65,7 +79,7 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
     currentQuestion: question,
     history,
     code,
-    output: globalOutput, // Renamed to avoid conflict with local/remote outputs
+    output: globalOutput,
     loading,
     executing,
     hint,
@@ -89,8 +103,33 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
   // State for Submission Progress Modal
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
 
+  // Hydrate Initial Data
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+      if (hydratedRef.current) return;
+      hydratedRef.current = true;
+
+      // 1. Hydrate User
+      if (initialUser && !user) {
+          dispatch(setUser(initialUser));
+      }
+
+      // 2. Hydrate Question List (Need to pass to QuestionList or Store)
+      // Since QuestionList fetches on its own, we should update QuestionList to accept props. 
+      // OR store it in Redux. For now, let's assume we update QuestionList to take props.
+      
+      // 3. Hydrate Current Question
+      if (initialCurrentQuestion) {
+          dispatch(setCurrentQuestion(initialCurrentQuestion));
+          dispatch(setCode(initialCurrentQuestion.referenceCode || '# write your code here\nprint("Hello World")'));
+      }
+      
+      // 4. Fetch History (Client-side is fine for specific user history)
+      fetchHistoryData();
+
+  }, [dispatch, initialUser, initialCurrentQuestion, user, categorySlug]);
+
   // Sync Local Output to Redux Console
-  // Only sync LOCAL execution output (Run button), not remote submission
   useEffect(() => {
     if (localOutput.length > 0) {
       dispatch(setOutput(localOutput.join('\n')));
@@ -221,43 +260,15 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
     }
   };
 
-  // CSR: Check auth and fetch data on mount
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // 1. Check authentication
-        const profileRes = await fetch('/api/users/profile', { credentials: 'include' });
-        
-        if (!profileRes.ok) {
-          router.replace('/login');
-          return;
-        }
-        
-        const userData = await profileRes.json();
-        dispatch(setUser(userData));
-        
-        // 2. Fetch history
-        fetchHistoryData();
-        
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        router.replace('/login');
-      }
-    };
-    
-    initializeData();
-      
-    // Cleanup on unmount
-    return () => {
-       dispatch(resetQuestion());
-    };
-  }, [dispatch, router, fetchHistoryData]);
-
   // Load question from URL param 'q' if present (Mock Exam Navigation)
+  // Only update if searchParam changes and differs from current (SSR handled initial load)
   const searchParams = useSearchParams();
   const qId = searchParams.get('q');
+  const prevQIdRef = useRef<string | null>(initialCurrentQuestion?._id || null);
 
   useEffect(() => {
+    // If SSR loaded it initially, we don't need to re-fetch on mount unless qId changed client-side
+    // Logic: if qId exists and != currentQuestion._id, fetch it.
       if (qId && (!question || question._id !== qId)) {
           const loadSpecificQuestion = async () => {
               dispatch(setLoading(true));
@@ -572,12 +583,10 @@ export function ExamContent({ subjectSlug, categorySlug }: ExamContentProps) {
              <QuestionList 
                 categorySlug={categorySlug}
                 currentQuestionId={question?._id}
+                initialQuestions={initialQuestions} // Pass hydrated list
                 className="w-full h-full border-none bg-transparent"
                 onSelectQuestion={(id) => {
                     router.push(`/exam/${subjectSlug}/${categorySlug}?q=${id}`);
-                    // Optional: Close sidebar on selection on mobile, but maybe keep open on desktop?
-                    // User didn't specify, but for "hamburger menu" usually it closes or stays.
-                    // Let's keep it open for navigation unless screen is small.
                 }}
             />
           </div>

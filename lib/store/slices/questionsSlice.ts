@@ -21,6 +21,7 @@ export interface Question {
   difficulty?: 'easy' | 'medium' | 'hard';
   constraints?: string;
   fileAssets?: Record<string, string>;
+  referenceCode?: string;
 }
 
 export interface HistoryItem {

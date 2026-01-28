@@ -19,19 +19,27 @@ interface QuestionListProps {
   categorySlug: string;
   currentQuestionId?: string;
   onSelectQuestion?: (id: string) => void;
+  initialQuestions?: QuestionSummary[];
   className?: string;
 }
 
-export function QuestionList({ categorySlug, currentQuestionId, onSelectQuestion, className }: QuestionListProps) {
+export function QuestionList({ categorySlug, currentQuestionId, initialQuestions, onSelectQuestion, className }: QuestionListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [questions, setQuestions] = useState<QuestionSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [questions, setQuestions] = useState<QuestionSummary[]>(initialQuestions || []);
+  const [loading, setLoading] = useState(!initialQuestions || initialQuestions.length === 0);
 
   // Parse current QID from URL if not provided prop
   const activeId = currentQuestionId || searchParams.get('q');
 
   useEffect(() => {
+    // If we have initialQuestions, skip fetch unless categorySlug changes (and initialQuestions doesn't match? - simplified for now)
+    if (initialQuestions && initialQuestions.length > 0) {
+        setQuestions(initialQuestions);
+        setLoading(false);
+        return;
+    }
+
     const fetchList = async () => {
       try {
         setLoading(true);
@@ -45,7 +53,7 @@ export function QuestionList({ categorySlug, currentQuestionId, onSelectQuestion
     };
 
     fetchList();
-  }, [categorySlug]);
+  }, [categorySlug, initialQuestions]);
 
   const handleSelect = (id: string) => {
     if (onSelectQuestion) {

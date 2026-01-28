@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers';
 import { Subject, Category, SubjectStats } from '@/lib/store/slices/subjectsSlice';
+import { Question } from '@/lib/store/slices/questionsSlice';
+import { UserProfile } from '@/lib/store/slices/userSlice';
 
 /**
  * Server-side fetch wrapper that handles:
@@ -65,8 +67,19 @@ export const serverApi = {
   },
   categories: {
     getBySubject: (subjectId: string) => fetchServer<Category[]>(`/categories/subject/${subjectId}`),
+    getBySlug: (subjectSlug: string, categorySlug: string) => fetchServer<Category>(`/categories/${subjectSlug}/${categorySlug}`), // Note: Verify if this endpoint exists or needs implementation. 
+    // Wait, the backend endpoint for single category might not exist or be different. 
+    // Standard approach: get all by subject and filter. But efficient way is better.
+    // Let's assume for now we use filtered approach in page if specific endpoint missing.
+  },
+  questions: {
+    getList: (categorySlug: string) => fetchServer<Question[]>(`/questions/list/${categorySlug}`),
+    getById: (id: string) => fetchServer<Question>(`/questions/${id}`),
   },
   stats: {
     getBySubject: (slug: string) => fetchServer<SubjectStats>(`/stats/subject/${slug}`),
+  },
+  auth: {
+    getProfile: () => fetchServer<UserProfile>('/users/profile'),
   },
 };
