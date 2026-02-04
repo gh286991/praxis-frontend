@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -24,6 +24,7 @@
     "clsx": "^2.1.1",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.562.0",
+    "monaco-editor": "^0.55.1",
     "next": "16.1.2",
     "pyodide": "^0.29.1",
     "react": "19.2.3",
@@ -48,6 +49,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.2",
     "jsdom": "^27.4.0",
+    "monaco-editor-webpack-plugin": "^7.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.17"

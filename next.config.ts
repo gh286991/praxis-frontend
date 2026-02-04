@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import MonacoWebpackPlugin from 'monaco-editor-webpack-plugin';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -13,6 +14,17 @@ const nextConfig: NextConfig = {
         hostname: '*.googleusercontent.com',
       },
     ],
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.plugins.push(
+        new MonacoWebpackPlugin({
+          languages: ['python'],
+          filename: 'static/[name].worker.js',
+        })
+      );
+    }
+    return config;
   },
   async rewrites() {
     return [

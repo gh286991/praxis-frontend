@@ -1,5 +1,11 @@
-import Editor from '@monaco-editor/react';
+import Editor, { loader } from '@monaco-editor/react';
 import { Play, Loader2 } from 'lucide-react';
+import * as monaco from 'monaco-editor';
+
+// Configure monaco loader to use local instance
+if (typeof window !== 'undefined') {
+  loader.config({ monaco });
+}
 
 interface EditorPanelProps {
   code: string;

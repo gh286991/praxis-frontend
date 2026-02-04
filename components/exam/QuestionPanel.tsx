@@ -107,7 +107,7 @@ export function QuestionPanel({ question, loading }: QuestionPanelProps) {
           <div className="relative px-5 py-3 bg-gradient-to-r from-slate-800/80 to-slate-900/80 border-b border-slate-700/50 flex justify-between items-center">
             <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">範例輸入</h3>
           </div>
-          <pre className="relative p-5 font-mono text-sm text-cyan-200 overflow-x-auto">
+          <pre className="relative p-5 font-mono text-sm text-cyan-200 overflow-x-auto whitespace-pre leading-normal">
             {question.sampleInput || <span className="text-slate-600 italic">無需輸入</span>}
           </pre>
         </div>
@@ -117,7 +117,7 @@ export function QuestionPanel({ question, loading }: QuestionPanelProps) {
           <div className="relative px-5 py-3 bg-gradient-to-r from-slate-800/80 to-slate-900/80 border-b border-slate-700/50 flex justify-between items-center">
             <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">範例輸出</h3>
           </div>
-          <pre className="relative p-5 font-mono text-sm text-emerald-200 overflow-x-auto">{question.sampleOutput}</pre>
+          <pre className="relative p-5 font-mono text-sm text-emerald-200 overflow-x-auto whitespace-pre leading-normal">{question.sampleOutput}</pre>
         </div>
       </div>
     </div>
