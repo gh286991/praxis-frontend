@@ -13,6 +13,7 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Enable cookies for cross-site requests
+  timeout: 120000, // 2 minutes timeout for AI operations
 });
 
 // Request interceptor removed as cookies are handled by browser automatically

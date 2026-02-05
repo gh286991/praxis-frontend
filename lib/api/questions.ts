@@ -35,10 +35,11 @@ export const questionsApi = {
   /**
    * Get AI-generated hint for a question
    */
-  getHint: async (questionId: string, code: string) => {
+  getHint: async (questionId: string, code: string, type: 'logic' | 'code' = 'code') => {
     const response = await apiClient.post('/questions/hint', {
       questionId,
       code,
+      type,
     });
     return response.data;
   },
@@ -58,4 +59,17 @@ export const questionsApi = {
     const response = await apiClient.get(`/questions/${id}`);
     return response.data;
   },
+
+  /**
+   * Chat with AI Tutor
+   */
+  chatWithTutor: async (questionId: string, code: string, chatHistory: any[], message: string) => {
+    const response = await apiClient.post('/questions/chat', {
+        questionId,
+        code,
+        chatHistory,
+        message
+    });
+    return response.data; // { response: "..." }
+  }
 };

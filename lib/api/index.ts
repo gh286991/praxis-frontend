@@ -39,6 +39,7 @@ export const submitAnswer = questionsApi.submitAnswer;
 export const getHint = questionsApi.getHint;
 export const getHistory = questionsApi.getHistory;
 export const getQuestionById = questionsApi.getById;
+export const chatWithTutor = questionsApi.chatWithTutor;
 
 // Execution
 export const runCode = executionApi.run;

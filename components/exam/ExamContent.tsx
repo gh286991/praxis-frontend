@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { submitAnswer, getHint, getHistory, getQuestionById } from '@/lib/api';
+import { submitAnswer, getHint, getHistory, getQuestionById, chatWithTutor } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setUser, logout } from '@/lib/store/slices/userSlice';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,7 @@ import type { HistoryItem } from '@/lib/store/slices/questionsSlice';
 import { CyberpunkBackground } from '@/components/CyberpunkBackground';
 import { usePyodide } from '@/hooks/usePyodide';
 import { useRemoteExecution } from '@/hooks/useRemoteExecution';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import 'highlight.js/styles/github-dark.css';
+
 
 const examTitles: Record<string, string> = {
   category1: '第1類：基本程式設計',
@@ -47,10 +44,17 @@ import { Subject, Category } from '@/lib/store/slices/subjectsSlice';
 import { UserProfile } from '@/lib/store/slices/userSlice';
 import { QuestionPanel } from '@/components/exam/QuestionPanel';
 import { QuestionList } from '@/components/exam/QuestionList';
-import { EditorPanel } from '@/components/exam/EditorPanel';
+
+import dynamic from 'next/dynamic';
+
+const EditorPanel = dynamic(
+  () => import('@/components/exam/EditorPanel').then((mod) => mod.EditorPanel),
+  { ssr: false }
+);
 import { ConsolePanel } from '@/components/exam/ConsolePanel';
 import { StreamingSubmissionModal } from '@/components/exam/StreamingSubmissionModal';
 import GenerationModal from '@/components/exam/GenerationModal';
+import { TutorSidebar } from '@/components/exam/TutorSidebar';
 import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
 
 interface ExamContentProps {
@@ -172,11 +176,83 @@ export function ExamContent({
     }
   }, [examId, dispatch]);
 
+  // Tutor State
+  const [isTutorOpen, setIsTutorOpen] = useState(false);
+  const [logicHint, setLogicHint] = useState<string | null>(null);
+  const [codeHint, setCodeHint] = useState<string | null>(null);
+  
+  // Chat State
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'model'; message: string }[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+
+  // Hint State
+  const [showFloatingHint, setShowFloatingHint] = useState(false);
+  const lastActivityRef = useRef(Date.now());
+
+  const handleGetTutorLogic = async () => {
+        if (!question || !code) return;
+        setHintLoading(true);
+        setIsTutorOpen(true);
+        try {
+            // Check if we already have it to save tokens
+            if (logicHint) return;
+
+            const result = await getHint(question._id, code, 'logic');
+            if (result.hint) {
+                setLogicHint(result.hint);
+            }
+        } catch (error) {
+            console.error('Failed to get logic hint:', error);
+        } finally {
+            setHintLoading(false);
+        }
+  };
+
+  const handleGetTutorCode = async () => {
+        if (!question || !code) return;
+        setHintLoading(true);
+        try {
+            const result = await getHint(question._id, code, 'code');
+            if (result.hint) {
+                setCodeHint(result.hint);
+            }
+        } catch (error) {
+            console.error('Failed to get code hint:', error);
+        } finally {
+            setHintLoading(false);
+        }
+  };
+
+  // Inactivity Check for Floating Hint
+  useEffect(() => {
+    const checkInactivity = setInterval(() => {
+        const inactiveDuration = Date.now() - lastActivityRef.current;
+        // Show hint if inactive for 10s, hint not open, not completed, and has code (don't hint on empty if they just loaded)
+        // actually hint on empty is fine too ("how to start")
+        if (inactiveDuration > 10000 && !isHintOpen && !isCompleted && !showFloatingHint) {
+            setShowFloatingHint(true);
+        }
+    }, 1000);
+
+    return () => clearInterval(checkInactivity);
+  }, [isHintOpen, isCompleted, showFloatingHint]);
+
+  const handleCodeChange = (newCode: string | undefined) => {
+      lastActivityRef.current = Date.now();
+      if (showFloatingHint) setShowFloatingHint(false);
+      dispatch(setCode(newCode || ''));
+  };
+
+
+
   const handleRun = async () => {
     dispatch(setExecuting(true));
     dispatch(setOutput('Initializing local Python environment...'));
     setIsPassed(undefined); // Reset status
     setRunResults([]); // Reset results
+    // Reset activity to prevent hint popping up while running
+    lastActivityRef.current = Date.now();
+    setShowFloatingHint(false);
 
     try {
       // Determine samples to run
@@ -257,6 +333,28 @@ export function ExamContent({
       dispatch(setOutput('Execution failed due to an error.'));
     } finally {
       dispatch(setExecuting(false));
+    }
+  };
+
+  const handleSendChat = async (message: string) => {
+    if (!question || !code) return;
+    
+    const newHistory = [...chatHistory, { role: 'user' as const, message }];
+    setChatHistory(newHistory);
+    setChatLoading(true);
+
+    try {
+        const result = await chatWithTutor(question._id, code, newHistory, message);
+        
+        // Check if response is string or object (API might return { response: string })
+        const reply = typeof result === 'string' ? result : result.response;
+        
+        setChatHistory([...newHistory, { role: 'model' as const, message: reply }]);
+    } catch (error) {
+        console.error('Chat failed:', error);
+        setChatHistory([...newHistory, { role: 'model' as const, message: '抱歉，發生錯誤，請再試一次 (AI Error)。' }]);
+    } finally {
+        setChatLoading(false);
     }
   };
 
@@ -453,23 +551,7 @@ export function ExamContent({
   };
   
   const handleGetHint = async () => {
-    if (!question) return;
-    
-    setHintLoading(true);
-    try {
-      const res = await getHint(question._id, code);
-      if (res.hint) {
-        dispatch(setHint(res.hint));
-        dispatch(setIsHintOpen(true));
-      } else {
-        alert('無法取得提示');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('取得提示時發生錯誤');
-    } finally {
-      setHintLoading(false);
-    }
+    handleGetTutorLogic();
   };
 
   const handleSubmit = async () => {
@@ -759,42 +841,76 @@ export function ExamContent({
              <GripVertical className="w-4 h-4 text-slate-700 group-hover:text-indigo-400 transition-colors" />
             </div>
 
-            {/* Right Panel: Editor & Output */}
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative w-0 bg-slate-900/20">
-            {/* Hint Overlay */}
-            {isHintOpen && hint && (
-                <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-200">
-                <div className="bg-slate-900 border border-amber-500/30 rounded-lg shadow-[0_0_50px_rgba(245,158,11,0.1)] max-w-2xl w-full overflow-hidden flex flex-col max-h-[85vh]">
-                    <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                        <div className="flex items-center gap-2 text-amber-400 font-bold font-mono tracking-wider text-sm uppercase">
-                            <Lightbulb className="w-4 h-4" />
-                            AI Assistant Analysis
+            {/* Right Panel: Editor & Output & Tutor Side-by-Side */}
+            <div className="flex-1 flex flex-row min-w-0 h-full overflow-hidden relative w-0 bg-slate-900/20">
+                
+                {/* Editor Container */}
+                <div className="flex-1 flex flex-col min-w-0 h-full relative">
+                    
+                    {/* Context-Aware Floating Hint TRIGGER */}
+                    {showFloatingHint && !isTutorOpen && (
+                        <div className="absolute bottom-6 right-8 z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <button
+                                onClick={handleGetTutorLogic} // Calls new logic handler
+                                disabled={hintLoading}
+                                className="flex items-center gap-3 px-4 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 hover:border-indigo-500/50 rounded-full shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] transition-all group backdrop-blur-md"
+                            >
+                                <div className="p-1.5 bg-indigo-500/20 rounded-full group-hover:bg-indigo-500/30 transition-colors">
+                                    <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                                </div>
+                                <div className="text-left mr-2">
+                                    <p className="text-xs font-bold text-indigo-300">Need some guidance?</p>
+                                    <p className="text-[10px] text-indigo-400/70">Click to open AI Learning Guide</p>
+                                </div>
+                            </button>
                         </div>
-                        <button 
-                            onClick={() => dispatch(setIsHintOpen(false))}
-                            className="text-slate-500 hover:text-white hover:bg-slate-800 p-1 rounded transition-colors"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
+                    )}
+
+                    <div className="flex-1 min-h-0 relative">
+                    <EditorPanel 
+                        code={code}
+                        onChange={handleCodeChange}
+                        onRun={handleRun}
+                        isExecuting={executing}
+                    />
                     </div>
-                    <div className="p-6 overflow-y-auto custom-scrollbar">
-                        <div className="space-y-4 text-sm font-light">
-                            <div className="prose prose-invert prose-amber max-w-none leading-loose tracking-wider prose-headings:mb-4 prose-headings:mt-8 prose-li:my-2 prose-ul:list-disc prose-ul:pl-6 prose-p:my-4 text-base">
-                                <ReactMarkdown 
-                                    remarkPlugins={[remarkGfm]} 
-                                    rehypePlugins={[rehypeHighlight]}
-                                >
-                                    {hint}
-                                </ReactMarkdown>
-                            </div>
-                        </div>
-                        <div className="mt-8 pt-4 border-t border-slate-800 text-center">
-                            <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Analysis Completed</p>
-                        </div>
+                    
+                    {/* Resizable Divider (Vertical) */}
+                    <div
+                        style={{ height: '8px', zIndex: 50, cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        className="bg-slate-950 hover:bg-indigo-500/20 transition-colors relative flex-shrink-0 group border-y border-slate-800/80"
+                        onMouseDown={() => setIsDraggingConsole(true)}
+                    >
+                    <GripHorizontal className="w-4 h-4 text-slate-700 group-hover:text-indigo-400 transition-colors" />
+                    </div>
+
+                    {/* Output Console */}
+                    <div 
+                        style={{ height: `${consoleHeight}px` }}
+                        className="flex-shrink-0 bg-slate-950/50 backdrop-blur-sm relative"
+                    >
+                        <ConsolePanel 
+                          output={globalOutput} 
+                          height={consoleHeight}
+                          input={question?.sampleInput}
+                          expectedOutput={question?.sampleOutput}
+                          passed={isPassed}
+                          samples={question?.samples}
+                          results={runResults}
+                        />
                     </div>
                 </div>
-                </div>
-            )}
+
+                {/* AI Tutor Sidebar (Collapsible) */}
+                <TutorSidebar
+                    isOpen={isTutorOpen}
+                    onClose={() => setIsTutorOpen(false)}
+                    chatHistory={chatHistory}
+                    onSendChat={handleSendChat}
+                    chatLoading={chatLoading}
+                />
+
+            </div>
 
             {/* Streaming Submission Modal - Shows streaming status and results */}
             <StreamingSubmissionModal
@@ -820,33 +936,6 @@ export function ExamContent({
                 messages={generationMessages}
                 onClose={() => setIsGenerationModalOpen(false)}
             />
-
-            <EditorPanel 
-              code={code}
-              onChange={(val) => dispatch(setCode(val || ''))}
-              onRun={handleRun}
-              isExecuting={executing}
-            />
-            
-            {/* Resizable Divider (Vertical) */}
-            <div
-                style={{ height: '8px', zIndex: 50, cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                className="bg-slate-950 hover:bg-indigo-500/20 transition-colors relative flex-shrink-0 group border-y border-slate-800/80"
-                onMouseDown={() => setIsDraggingConsole(true)}
-            >
-                <GripHorizontal className="h-4 w-4 text-slate-700 group-hover:text-indigo-400 transition-colors" />
-            </div>
-            
-            <ConsolePanel 
-              output={globalOutput} 
-              height={consoleHeight} 
-              input={question?.sampleInput}
-              expectedOutput={question?.sampleOutput}
-              passed={isPassed}
-              samples={question?.samples}
-              results={runResults}
-            />
-            </div>
         </main>
       </div>
     </div>
