@@ -125,7 +125,14 @@ export function usePyodide(): UsePyodideReturn {
         }
       }
 
-      await pyodideRef.current.runPythonAsync(code);
+      // Create a fresh global scope for each run to avoid pollution
+      const globals = pyodideRef.current.toPy({});
+      try {
+        await pyodideRef.current.runPythonAsync(code, { globals });
+      } finally {
+        globals.destroy();
+      }
+
       return { output: capturedOutput.join('\n'), error: null }; 
     } catch (err: any) {
       const errorMsg = err.toString();

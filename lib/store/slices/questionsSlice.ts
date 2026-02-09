@@ -32,6 +32,12 @@ export interface HistoryItem {
   code?: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'model';
+  message: string;
+  timestamp?: number;
+}
+
 interface QuestionsState {
   currentQuestion: Question | null;
   history: HistoryItem[];
@@ -48,6 +54,8 @@ interface QuestionsState {
     testResult: { passed: boolean; results: any[] };
     semanticResult: { passed: boolean; feedback: string };
   } | null;
+  // Map questionId -> chat history
+  chatHistories: Record<string, ChatMessage[]>;
 }
 
 const initialState: QuestionsState = {
@@ -62,6 +70,7 @@ const initialState: QuestionsState = {
   isCompleted: false,
   submissionLoading: false,
   submissionResult: null,
+  chatHistories: {},
 };
 
 const questionsSlice = createSlice({
@@ -111,6 +120,16 @@ const questionsSlice = createSlice({
     setSubmissionResult: (state, action: PayloadAction<any>) => {
       state.submissionResult = action.payload;
     },
+    updateChatHistory: (state, action: PayloadAction<{ questionId: string; messages: ChatMessage[] }>) => {
+      const { questionId, messages } = action.payload;
+      state.chatHistories[questionId] = messages;
+    },
+    prependChatHistory: (state, action: PayloadAction<{ questionId: string; messages: ChatMessage[] }>) => {
+      const { questionId, messages } = action.payload;
+      const current = state.chatHistories[questionId] || [];
+      // Prepends new messages (older history) to the existing list
+      state.chatHistories[questionId] = [...messages, ...current];
+    },
   },
 });
 
@@ -127,6 +146,8 @@ export const {
   resetQuestion,
   setSubmissionLoading,
   setSubmissionResult,
+  updateChatHistory,
+  prependChatHistory,
 } = questionsSlice.actions;
 
 export default questionsSlice.reducer;

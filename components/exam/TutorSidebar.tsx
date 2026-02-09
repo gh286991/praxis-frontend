@@ -12,6 +12,8 @@ interface TutorSidebarProps {
   chatHistory: { role: 'user' | 'model'; message: string }[];
   onSendChat: (message: string) => void;
   chatLoading: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
 export function TutorSidebar({
@@ -19,16 +21,38 @@ export function TutorSidebar({
   onClose,
   chatHistory,
   onSendChat,
-  chatLoading
+  chatLoading,
+  onLoadMore,
+  hasMore = false
 }: TutorSidebarProps) {
   const [inputMessage, setInputMessage] = React.useState('');
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [isAutoScroll, setIsAutoScroll] = React.useState(true);
 
+  // Auto-scroll to bottom only when new messages added at the END
   React.useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && isAutoScroll) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [chatHistory]);
+  }, [chatHistory, isAutoScroll]);
+
+  // Handle scroll to detect load more (top) and auto-scroll state
+  const handleScroll = () => {
+      if (!scrollRef.current) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      
+      // If user scrolls up significantly, disable auto-scroll
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setIsAutoScroll(isAtBottom);
+
+      // Trigger load more if at top
+      if (scrollTop === 0 && hasMore && onLoadMore) {
+          // Store current scroll height to restore position after load
+          // Logic for restoring scroll position must be managed carefully, likely by detecting height change
+          onLoadMore();
+      }
+  };
 
   const handleSendMessage = () => {
     if (!inputMessage.trim() || chatLoading) return;
@@ -64,7 +88,18 @@ export function TutorSidebar({
       <div className="flex-1 overflow-hidden relative flex flex-col">
         
             <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4" ref={scrollRef}>
+                <div 
+                    className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4" 
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                >
+                    {hasMore && (
+                        <div className="flex justify-center py-2">
+                            <span className="w-1.5 h-1.5 bg-slate-600 rounded-full animate-bounce mx-0.5"></span>
+                            <span className="w-1.5 h-1.5 bg-slate-600 rounded-full animate-bounce mx-0.5 delay-75"></span>
+                            <span className="w-1.5 h-1.5 bg-slate-600 rounded-full animate-bounce mx-0.5 delay-150"></span>
+                        </div>
+                    )}
                     {chatHistory.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="w-16 h-16 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center mb-2 ring-1 ring-white/10">

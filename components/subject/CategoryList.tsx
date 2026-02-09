@@ -1,4 +1,5 @@
 import { List, FileQuestion, BookOpen } from 'lucide-react';
+import Link from 'next/link';
 import { TerminalWindow } from '@/components/TerminalWindow';
 import { cn } from '@/lib/utils';
 import React, { useState } from 'react';
@@ -22,7 +23,7 @@ export function CategoryList({
   subjectSlug,
   chapters,
   exams,
-  onSelectCategory,
+  // onSelectCategory,
 }: CategoryListProps) {
   const [activeTab, setActiveTab] = useState<'chapters' | 'exams'>('chapters');
 
@@ -66,10 +67,10 @@ export function CategoryList({
               <div className="space-y-4">
                 {chapters.length > 0 ? (
                   chapters.map((category, index) => (
-                    <button
+                    <Link
                       key={category._id}
-                      onClick={() => onSelectCategory(category.slug)}
-                      className="w-full text-left group relative overflow-hidden bg-slate-900/40 hover:bg-slate-800/60 border border-slate-700/50 hover:border-cyan-500/50 transition-all duration-300 p-4 rounded flex items-center gap-4"
+                      href={`/exam/${subjectSlug}/${category.slug}`}
+                      className="block w-full text-left group relative overflow-hidden bg-slate-900/40 hover:bg-slate-800/60 border border-slate-700/50 hover:border-cyan-500/50 transition-all duration-300 p-4 rounded flex items-center gap-4"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div className="flex-shrink-0 w-10 h-10 bg-slate-800 border border-slate-700 rounded flex items-center justify-center text-slate-500 font-mono text-sm group-hover:text-cyan-400 group-hover:border-cyan-500/50 transition-colors">
@@ -88,7 +89,7 @@ export function CategoryList({
                       <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-300">
                         <span className="text-xs text-cyan-500 font-mono">[ 載入模組 ]</span>
                       </div>
-                    </button>
+                    </Link>
                   ))
                 ) : (
                   <div className="text-center py-12 border border-dashed border-slate-800 rounded">
@@ -107,10 +108,10 @@ export function CategoryList({
               <div className="space-y-4">
                 {exams.length > 0 ? (
                   exams.map((category, index) => (
-                    <button
+                    <Link
                       key={category._id}
-                      onClick={() => onSelectCategory(category.slug)}
-                      className="w-full text-left group relative overflow-hidden bg-rose-950/10 hover:bg-rose-900/20 border border-rose-900/30 hover:border-rose-500/50 transition-all duration-300 p-4 rounded flex items-center gap-4"
+                      href={`/exam/${subjectSlug}/${category.slug}`}
+                      className="block w-full text-left group relative overflow-hidden bg-rose-950/10 hover:bg-rose-900/20 border border-rose-900/30 hover:border-rose-500/50 transition-all duration-300 p-4 rounded flex items-center gap-4"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div className="flex-shrink-0 w-10 h-10 bg-rose-900/20 border border-rose-800/50 rounded flex items-center justify-center text-rose-500 font-mono text-sm group-hover:text-rose-400 group-hover:border-rose-500/50 transition-colors">
@@ -136,7 +137,7 @@ export function CategoryList({
                       <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-300">
                         <span className="text-xs text-rose-500 font-mono">[ 開始測驗 ]</span>
                       </div>
-                    </button>
+                    </Link>
                   ))
                 ) : (
                   <div className="text-center py-12 border border-dashed border-rose-900/30 rounded bg-rose-950/5">

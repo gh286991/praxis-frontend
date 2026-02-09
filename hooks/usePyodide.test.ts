@@ -8,6 +8,7 @@ const createMockPyodide = () => ({
   setStdout: vi.fn(),
   setStderr: vi.fn(),
   setStdin: vi.fn(),
+  toPy: vi.fn(() => ({ destroy: vi.fn() })),
   FS: {
     writeFile: vi.fn(),
   },
@@ -273,7 +274,7 @@ describe('usePyodide', () => {
       
       expect(mockPyodide.setStdout).toHaveBeenCalled();
       expect(mockPyodide.setStderr).toHaveBeenCalled();
-      expect(mockPyodide.runPythonAsync).toHaveBeenCalledWith('print("Hello World")');
+      expect(mockPyodide.runPythonAsync).toHaveBeenCalledWith('print("Hello World")', expect.anything());
       expect(runResult?.output).toBe('Hello World');
       expect(runResult?.error).toBeNull();
     });

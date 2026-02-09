@@ -38,8 +38,11 @@ import {
   setIsHintOpen,
   setIsCompleted,
   setSubmissionLoading,
-  setSubmissionResult
+  setSubmissionResult,
+  updateChatHistory,
+  prependChatHistory
 } from '@/lib/store/slices/questionsSlice';
+import { questionsApi } from '@/lib/api/questions';
 import { Subject, Category } from '@/lib/store/slices/subjectsSlice';
 import { UserProfile } from '@/lib/store/slices/userSlice';
 import { QuestionPanel } from '@/components/exam/QuestionPanel';
@@ -181,9 +184,64 @@ export function ExamContent({
   const [logicHint, setLogicHint] = useState<string | null>(null);
   const [codeHint, setCodeHint] = useState<string | null>(null);
   
-  // Chat State
-  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'model'; message: string }[]>([]);
+  // Chat State - Managed via Redux per question
+  const chatHistories = useAppSelector((state) => state.questions.chatHistories);
+  const chatHistory = question ? (chatHistories[question._id] || []) : [];
+  
   const [chatLoading, setChatLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+
+  // Fetch chat history from DB when question loads
+  const loadChatHistory = useCallback(async (questionId: string, limit: number = 20, before?: string) => {
+      try {
+          if (!before) setChatLoading(true);
+          else setHistoryLoading(true); // Loading older messages
+
+          const history = await questionsApi.getChatHistory(questionId, limit, before);
+          
+          if (history && Array.isArray(history)) {
+              if (history.length < limit) {
+                  setHasMoreHistory(false);
+              } else {
+                  setHasMoreHistory(true);
+              }
+
+              if (before) {
+                  // Prepend older messages
+                  dispatch(prependChatHistory({ questionId, messages: history }));
+              } else {
+                  // Initial load (replace)
+                  dispatch(updateChatHistory({ questionId, messages: history }));
+              }
+          }
+      } catch(e) { 
+          console.error('Failed to load chat history:', e); 
+      } finally {
+          setChatLoading(false);
+          setHistoryLoading(false);
+      }
+  }, [dispatch]);
+
+  // Initial load effect
+  useEffect(() => {
+    if (question?._id) {
+       // Reset hasMore on new question
+       setHasMoreHistory(true); 
+       loadChatHistory(question._id);
+    }
+  }, [question?._id, loadChatHistory]);
+
+  const handleLoadMoreChat = async () => {
+      if (!question || !hasMoreHistory || historyLoading || chatHistory.length === 0) return;
+      
+      const oldestMessage = chatHistory[0];
+      if (oldestMessage?.timestamp) {
+          // Convert timestamp to string if it's a number/Date, though API expects string/Date compatible
+          const beforeTime = new Date(oldestMessage.timestamp).toISOString();
+          await loadChatHistory(question._id, 20, beforeTime);
+      }
+  };
 
   // Hint State
   const [showFloatingHint, setShowFloatingHint] = useState(false);
@@ -237,12 +295,14 @@ export function ExamContent({
     return () => clearInterval(checkInactivity);
   }, [isHintOpen, isCompleted, showFloatingHint]);
 
+  // ... (handleCodeChange is here)
   const handleCodeChange = (newCode: string | undefined) => {
       lastActivityRef.current = Date.now();
       if (showFloatingHint) setShowFloatingHint(false);
       dispatch(setCode(newCode || ''));
   };
 
+  // ...
 
 
   const handleRun = async () => {
@@ -339,20 +399,30 @@ export function ExamContent({
   const handleSendChat = async (message: string) => {
     if (!question || !code) return;
     
+    // Optimistic Update
     const newHistory = [...chatHistory, { role: 'user' as const, message }];
-    setChatHistory(newHistory);
+    dispatch(updateChatHistory({ questionId: question._id, messages: newHistory }));
+    
     setChatLoading(true);
 
     try {
-        const result = await chatWithTutor(question._id, code, newHistory, message);
+        // Only send last 10 messages for context + current message
+        // Filter out any potential error messages from history if we want (optional)
+        const recentContext = newHistory.slice(-20); 
+
+        const result = await chatWithTutor(question._id, code, recentContext, message);
         
         // Check if response is string or object (API might return { response: string })
         const reply = typeof result === 'string' ? result : result.response;
         
-        setChatHistory([...newHistory, { role: 'model' as const, message: reply }]);
+        const finalHistory = [...newHistory, { role: 'model' as const, message: reply }];
+        dispatch(updateChatHistory({ questionId: question._id, messages: finalHistory }));
+
     } catch (error) {
         console.error('Chat failed:', error);
-        setChatHistory([...newHistory, { role: 'model' as const, message: '抱歉，發生錯誤，請再試一次 (AI Error)。' }]);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorHistory = [...newHistory, { role: 'model' as const, message: `抱歉，發生錯誤：${errorMessage}` }];
+        dispatch(updateChatHistory({ questionId: question._id, messages: errorHistory }));
     } finally {
         setChatLoading(false);
     }
@@ -851,7 +921,7 @@ export function ExamContent({
                     {showFloatingHint && !isTutorOpen && (
                         <div className="absolute bottom-6 right-8 z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <button
-                                onClick={handleGetTutorLogic} // Calls new logic handler
+                                onClick={() => setIsTutorOpen(true)} // Just open chat, don't generate hint
                                 disabled={hintLoading}
                                 className="flex items-center gap-3 px-4 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 hover:border-indigo-500/50 rounded-full shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] transition-all group backdrop-blur-md"
                             >
@@ -859,8 +929,8 @@ export function ExamContent({
                                     <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
                                 </div>
                                 <div className="text-left mr-2">
-                                    <p className="text-xs font-bold text-indigo-300">Need some guidance?</p>
-                                    <p className="text-[10px] text-indigo-400/70">Click to open AI Learning Guide</p>
+                                    <p className="text-xs font-bold text-indigo-300">需要幫忙嗎？</p>
+                                    <p className="text-[10px] text-indigo-400/70">點擊開啟 AI 導師</p>
                                 </div>
                             </button>
                         </div>
@@ -908,6 +978,8 @@ export function ExamContent({
                     chatHistory={chatHistory}
                     onSendChat={handleSendChat}
                     chatLoading={chatLoading}
+                    onLoadMore={handleLoadMoreChat}
+                    hasMore={hasMoreHistory}
                 />
 
             </div>

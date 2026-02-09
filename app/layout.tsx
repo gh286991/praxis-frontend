@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import { ReduxProvider } from "@/lib/store/ReduxProvider";
 import "./globals.css";
 
@@ -81,6 +82,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <NextTopLoader
+          color="#6366f1"
+          height={3}
+          showSpinner={false}
+          shadow="0 0 10px #6366f1,0 0 5px #6366f1"
+        />
         <ReduxProvider>{children}</ReduxProvider>
       </body>
     </html>

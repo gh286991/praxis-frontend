@@ -61,15 +61,40 @@ export const questionsApi = {
   },
 
   /**
+   * Get chat history for a question
+   */
+  getChatHistory: async (questionId: string, limit: number = 20, before?: string) => {
+    const query = new URLSearchParams({ limit: limit.toString() });
+    if (before) query.append('before', before);
+    
+    const response = await apiClient.get(`/questions/${questionId}/chat-history?${query.toString()}`);
+    return response.data;
+  },
+
+  /**
    * Chat with AI Tutor
    */
   chatWithTutor: async (questionId: string, code: string, chatHistory: any[], message: string) => {
-    const response = await apiClient.post('/questions/chat', {
-        questionId,
-        code,
-        chatHistory,
-        message
+    // Redirect to our custom proxy handler (moved to /ai-proxy to avoid Next.js rewrite conflict)
+    // Path: /ai-proxy/questions/chat (handled by app/ai-proxy/[...path]/route.ts)
+    // We use fetch directly to avoid apiClient automatically adding '/api' prefix
+    const response = await fetch('/ai-proxy/questions/chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            questionId,
+            code,
+            chatHistory,
+            message
+        })
     });
-    return response.data; // { response: "..." }
+    
+    if (!response.ok) {
+        throw new Error(`Proxy error: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json(); // { response: "..." }
   }
 };
