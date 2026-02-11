@@ -4,7 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 // Use relative path to go through Next.js proxy for proper cookie handling in production
 // On server side (SSR), we must use absolute URL to backend
 const baseURL = typeof window === 'undefined'
-  ? (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001')
+  ? (process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001')
   : '/api';
 
 const apiClient: AxiosInstance = axios.create({

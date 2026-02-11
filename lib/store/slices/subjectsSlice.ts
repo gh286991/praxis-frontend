@@ -31,6 +31,8 @@ export interface ProgressStats {
   failedQuestions: number;
   completionRate: number;
   passRate: number;
+  totalSubmissions?: number;
+  totalPassedSubmissions?: number;
 }
 
 export interface CategoryStats extends ProgressStats {

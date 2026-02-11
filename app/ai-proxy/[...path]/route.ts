@@ -10,7 +10,7 @@ export async function POST(
   // Ensure we use the correct backend URL with /api prefix if needed.
   // In .env, NEXT_PUBLIC_BACKEND_URL is http://localhost:3001/api
   // If env is missing, default to http://localhost:3001/api
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001/api";
+  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001/api";
   
   // Clean up double slashes just in case
   const baseUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;

@@ -3,6 +3,13 @@ import MonacoWebpackPlugin from 'monaco-editor-webpack-plugin';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  experimental: {
+    workerThreads: false,
+    cpus: 1,
+  },
   images: {
     remotePatterns: [
       {

@@ -3,7 +3,8 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { submitAnswer, getHint, getHistory, getQuestionById, chatWithTutor } from '@/lib/api';
+import { submitAnswer, getHistory, getQuestionById, chatWithTutor } from '@/lib/api';
+import apiClient from '@/lib/apiClient';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setUser, logout } from '@/lib/store/slices/userSlice';
 import { Button } from '@/components/ui/button';
@@ -46,7 +47,7 @@ import { questionsApi } from '@/lib/api/questions';
 import { Subject, Category } from '@/lib/store/slices/subjectsSlice';
 import { UserProfile } from '@/lib/store/slices/userSlice';
 import { QuestionPanel } from '@/components/exam/QuestionPanel';
-import { QuestionList } from '@/components/exam/QuestionList';
+import { QuestionList, QuestionSummary } from '@/components/exam/QuestionList';
 
 import dynamic from 'next/dynamic';
 
@@ -58,7 +59,7 @@ import { ConsolePanel } from '@/components/exam/ConsolePanel';
 import { StreamingSubmissionModal } from '@/components/exam/StreamingSubmissionModal';
 import GenerationModal from '@/components/exam/GenerationModal';
 import { TutorSidebar } from '@/components/exam/TutorSidebar';
-import { Loader2, Sparkles, Code2, ArrowLeft, Lightbulb, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
+import { Loader2, Sparkles, Code2, ArrowLeft, X, History, CheckCircle2, XCircle, SkipForward, Menu, LogOut, GripVertical, GripHorizontal, UploadCloud } from 'lucide-react';
 
 interface ExamContentProps {
   subjectSlug: string;
@@ -66,7 +67,7 @@ interface ExamContentProps {
   initialUser: UserProfile;
   initialSubject: Subject;
   initialCategory: Category | null;
-  initialQuestions: any[]; // Use proper type, currently QuestionSummary in QuestionList
+  initialQuestions: QuestionSummary[]; 
   initialCurrentQuestion: Question | null;
 }
 
@@ -89,9 +90,8 @@ export function ExamContent({
     output: globalOutput,
     loading,
     executing,
-    hint,
-    isHintOpen,
     isCompleted,
+    isHintOpen,
     submissionLoading,
     submissionResult,
   } = useAppSelector((state) => state.questions);
@@ -153,8 +153,9 @@ export function ExamContent({
   const [isDraggingConsole, setIsDraggingConsole] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // Hint loading state (UI only)
-  const [hintLoading, setHintLoading] = useState(false);
+
+  
+  // Hint loading state (UI only) - REMOVED
 
   // Result state
   const [isPassed, setIsPassed] = useState<boolean | undefined>(undefined);
@@ -164,6 +165,26 @@ export function ExamContent({
     expected: string;
     passed: boolean;
   }[]>([]);
+  
+  // Questions List State
+  const [questions, setQuestions] = useState<QuestionSummary[]>(initialQuestions || []);
+  
+  // Fetch questions if not provided
+  useEffect(() => {
+    if (initialQuestions && initialQuestions.length > 0) {
+        setQuestions(initialQuestions);
+    } else {
+        const fetchList = async () => {
+            try {
+                const res = await apiClient.get<QuestionSummary[]>(`/questions/list/${categorySlug}`);
+                setQuestions(res.data);
+            } catch (e) {
+                console.error('Failed to fetch questions:', e);
+            }
+        };
+        fetchList();
+    }
+  }, [categorySlug, initialQuestions]);
 
   // State for Generation Modal
   const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
@@ -181,8 +202,8 @@ export function ExamContent({
 
   // Tutor State
   const [isTutorOpen, setIsTutorOpen] = useState(false);
-  const [logicHint, setLogicHint] = useState<string | null>(null);
-  const [codeHint, setCodeHint] = useState<string | null>(null);
+
+  // Unused hint states removed
   
   // Chat State - Managed via Redux per question
   const chatHistories = useAppSelector((state) => state.questions.chatHistories);
@@ -247,39 +268,7 @@ export function ExamContent({
   const [showFloatingHint, setShowFloatingHint] = useState(false);
   const lastActivityRef = useRef(Date.now());
 
-  const handleGetTutorLogic = async () => {
-        if (!question || !code) return;
-        setHintLoading(true);
-        setIsTutorOpen(true);
-        try {
-            // Check if we already have it to save tokens
-            if (logicHint) return;
 
-            const result = await getHint(question._id, code, 'logic');
-            if (result.hint) {
-                setLogicHint(result.hint);
-            }
-        } catch (error) {
-            console.error('Failed to get logic hint:', error);
-        } finally {
-            setHintLoading(false);
-        }
-  };
-
-  const handleGetTutorCode = async () => {
-        if (!question || !code) return;
-        setHintLoading(true);
-        try {
-            const result = await getHint(question._id, code, 'code');
-            if (result.hint) {
-                setCodeHint(result.hint);
-            }
-        } catch (error) {
-            console.error('Failed to get code hint:', error);
-        } finally {
-            setHintLoading(false);
-        }
-  };
 
   // Inactivity Check for Floating Hint
   useEffect(() => {
@@ -431,8 +420,9 @@ export function ExamContent({
   // Load question from URL param 'q' if present (Mock Exam Navigation)
   // Only update if searchParam changes and differs from current (SSR handled initial load)
   const searchParams = useSearchParams();
+
   const qId = searchParams.get('q');
-  const prevQIdRef = useRef<string | null>(initialCurrentQuestion?._id || null);
+  // prevQIdRef removed
 
   useEffect(() => {
     // If SSR loaded it initially, we don't need to re-fetch on mount unless qId changed client-side
@@ -446,8 +436,7 @@ export function ExamContent({
                   // Reset state for new question
                   dispatch(setCode(q.referenceCode || '# write your code here\n'));
                   dispatch(setOutput(''));
-                  dispatch(setHint(null));
-                  dispatch(setIsHintOpen(false));
+                  dispatch(setOutput(''));
                   dispatch(setIsCompleted(false));
                   setRunResults([]);
                   setIsPassed(undefined);
@@ -594,7 +583,21 @@ export function ExamContent({
   };
   
   const handleSkip = async () => {
-      await handleGenerate();
+      // Find current index and go to next
+      if (!questions.length) return;
+      
+      const currentId = question?._id;
+      const currentIndex = questions.findIndex(q => q._id === currentId);
+      
+      let nextId;
+      if (currentIndex === -1 || currentIndex === questions.length - 1) {
+          // Wrap around or stop? Let's wrap around for now as 'skip' implies cycling
+          nextId = questions[0]._id;
+      } else {
+          nextId = questions[currentIndex + 1]._id;
+      }
+      
+      router.push(`/exam/${subjectSlug}/${categorySlug}?q=${nextId}`);
   };
 
   const handleLoadHistoryQuestion = async (item: HistoryItem) => {
@@ -604,8 +607,6 @@ export function ExamContent({
           dispatch(setCurrentQuestion(q));
           dispatch(setCode(item.code || '# write your code here\nprint("Hello World")'));
           dispatch(setOutput(''));
-          dispatch(setHint(null));
-          dispatch(setIsHintOpen(false));
           setIsSidebarOpen(false);
           dispatch(setIsCompleted(true));
           setRunResults([]);
@@ -620,9 +621,7 @@ export function ExamContent({
       }
   };
   
-  const handleGetHint = async () => {
-    handleGetTutorLogic();
-  };
+
 
   const handleSubmit = async () => {
     if (!question) return;
@@ -736,6 +735,7 @@ export function ExamContent({
                 categorySlug={categorySlug}
                 currentQuestionId={question?._id}
                 initialQuestions={initialQuestions} // Pass hydrated list
+                questions={questions}
                 className="w-full h-full border-none bg-transparent"
                 onSelectQuestion={(id) => {
                     router.push(`/exam/${subjectSlug}/${categorySlug}?q=${id}`);
@@ -826,14 +826,7 @@ export function ExamContent({
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    <button
-                    onClick={handleGetHint}
-                    disabled={hintLoading || !question}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 rounded-lg transition-all font-bold text-xs text-amber-400 disabled:opacity-30 disabled:cursor-not-allowed group"
-                    >
-                    {hintLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lightbulb className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />}
-                    AI HINT
-                    </button>
+
 
                     <button
                     onClick={handleSubmit}
@@ -855,14 +848,7 @@ export function ExamContent({
                     </button>
                     )}
 
-                    <button
-                    onClick={handleGenerate}
-                    disabled={loading}
-                    className="relative overflow-hidden group flex items-center gap-2 px-5 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 rounded-lg shadow-[0_0_15px_rgba(99,102,241,0.3)] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold text-xs text-white tracking-wide"
-                    >
-                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    {question ? 'NEXT PROBLEM' : 'START SESSION'}
-                    </button>
+
                     
                     <div className="h-6 w-px bg-slate-700/50 mx-2" />
                     
@@ -922,7 +908,6 @@ export function ExamContent({
                         <div className="absolute bottom-6 right-8 z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <button
                                 onClick={() => setIsTutorOpen(true)} // Just open chat, don't generate hint
-                                disabled={hintLoading}
                                 className="flex items-center gap-3 px-4 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 hover:border-indigo-500/50 rounded-full shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] transition-all group backdrop-blur-md"
                             >
                                 <div className="p-1.5 bg-indigo-500/20 rounded-full group-hover:bg-indigo-500/30 transition-colors">

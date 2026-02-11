@@ -1,145 +1,111 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-declare global {
-  interface Window {
-    loadPyodide: any;
-    pyodide: any;
-  }
-}
-
-interface UsePyodideReturn {
+export interface UsePyodideReturn {
   runCode: (code: string, input?: string, fileAssets?: Record<string, string>) => Promise<{ output: string; error: string | null }>;
   isLoading: boolean;
   output: string[];
   clearOutput: () => void;
+  terminate: () => void;
 }
 
 export function usePyodide(): UsePyodideReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [output, setOutput] = useState<string[]>([]);
-  const pyodideRef = useRef<any>(null);
+  const workerRef = useRef<Worker | null>(null);
 
+  // Initialize Worker
   useEffect(() => {
-    let mounted = true;
+    // Create worker
+    const worker = new Worker('/pyodide.worker.js');
+    workerRef.current = worker;
 
-    const loadPyodide = async () => {
-      try {
-        if (!window.loadPyodide) {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js';
-          script.async = true;
-          
-          script.onload = async () => {
-            if (!mounted) return;
-            try {
-              const pyodide = await window.loadPyodide({
-                  indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/'
-              });
-              if (mounted) {
-                pyodideRef.current = pyodide;
-              }
-            } catch (err) {
-              console.error('Failed to initialize Pyodide:', err);
-            } finally {
-              if (mounted) setIsLoading(false);
-            }
-          };
-
-          script.onerror = (err) => {
-              console.error('Failed to load Pyodide script from CDN', err);
-              if (mounted) setIsLoading(false);
-          };
-
-          document.body.appendChild(script);
-        } else if (!pyodideRef.current) {
-            // Window has loadPyodide but ref is null (re-mount)
-            try {
-                const pyodide = await window.loadPyodide({
-                    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/'
-                });
-                if (mounted) {
-                    pyodideRef.current = pyodide;
-                }
-            } catch (err) {
-                console.error('Failed to re-initialize Pyodide:', err);
-            } finally {
-                if (mounted) setIsLoading(false);
-            }
-        } else {
-            // Already initialized
+    worker.onmessage = (event) => {
+        const { type } = event.data;
+        if (type === 'loaded') {
             setIsLoading(false);
         }
-      } catch (e) {
-        console.error('Error in loadPyodide content', e);
-        if (mounted) setIsLoading(false);
-      }
     };
-
-    loadPyodide();
+    
+    // Trigger load
+    worker.postMessage({ type: 'load' });
 
     return () => {
-      mounted = false;
+      worker.terminate();
     };
   }, []);
 
   const clearOutput = useCallback(() => setOutput([]), []);
 
-  const runCode = useCallback(async (code: string, input: string = '', fileAssets?: Record<string, string>) => {
-    if (!pyodideRef.current) {
-      return { output: '', error: 'Pyodide is not loaded yet' };
-    }
+  const terminate = useCallback(() => {
+    if (workerRef.current) {
+        workerRef.current.terminate();
+        // Re-initialize worker
+        const worker = new Worker('/pyodide.worker.js');
+        workerRef.current = worker;
+        
+        worker.onmessage = (event) => {
+             const { type } = event.data;
+            if (type === 'loaded') {
+                setIsLoading(false);
+            }
+        };
 
-    // Reset output specific to this run
-    setOutput([]); 
-    const capturedOutput: string[] = [];
-
-    const handleOutput = (msg: string) => {
-        capturedOutput.push(msg);
-        setOutput((prev) => [...prev, msg]);
-    };
-    
-    const handleError = (msg: string) => {
-        const errorMsg = `Error: ${msg}`;
-        capturedOutput.push(errorMsg);
-        setOutput((prev) => [...prev, errorMsg]);
-    };
-
-    try {
-      // Setup stdin/stdout
-      pyodideRef.current.setStdout({ batched: handleOutput });
-      pyodideRef.current.setStderr({ batched: handleError });
-      
-      // Mock input() if needed
-      if (input) {
-          const stdinIterator = (function* () {
-             const lines = input.split('\n');
-             for(let line of lines) yield line;
-          })();
-          pyodideRef.current.setStdin({ stdin: () => stdinIterator.next().value });
-      }
-
-      // Write file assets to virtual filesystem (for file I/O questions)
-      if (fileAssets) {
-        for (const [filename, content] of Object.entries(fileAssets)) {
-          pyodideRef.current.FS.writeFile(filename, content);
-        }
-      }
-
-      // Create a fresh global scope for each run to avoid pollution
-      const globals = pyodideRef.current.toPy({});
-      try {
-        await pyodideRef.current.runPythonAsync(code, { globals });
-      } finally {
-        globals.destroy();
-      }
-
-      return { output: capturedOutput.join('\n'), error: null }; 
-    } catch (err: any) {
-      const errorMsg = err.toString();
-      setOutput((prev) => [...prev, errorMsg]);
-      return { output: capturedOutput.join('\n'), error: errorMsg };
+        // Trigger load
+        worker.postMessage({ type: 'load' });
+        setIsLoading(true); 
     }
   }, []);
 
-  return { runCode, isLoading, output, clearOutput };
+  const runCode = useCallback(async (code: string, input: string = '', fileAssets?: Record<string, string>) => {
+    if (!workerRef.current) {
+       return { output: '', error: 'Worker not initialized' };
+    }
+
+    setOutput([]);
+    const capturedOutput: string[] = [];
+    
+    return new Promise<{ output: string; error: string | null }>((resolve) => {
+        if (!workerRef.current) {
+             resolve({ output: '', error: 'Worker failed' });
+             return;
+        }
+
+        // Unique ID for this run
+        const runId = Date.now().toString();
+
+        const handleMessage = (event: MessageEvent) => {
+            const { type, content, id } = event.data;
+            
+            // Only handle messages for this run or global messages?
+            // Since we override onmessage, we handle everything.
+            if (id && id !== runId) return; 
+
+            if (type === 'output') {
+                capturedOutput.push(content);
+                setOutput(prev => [...prev, content]);
+            } else if (type === 'error') {
+                 // Format error
+                 const errorMsg = `Error: ${content}`;
+                 capturedOutput.push(errorMsg);
+                 setOutput(prev => [...prev, errorMsg]);
+            } else if (type === 'done') {
+                // Restore loading listener or keep?
+                // For simplicity, we keep this listener active until next run replacing it.
+                resolve({ output: capturedOutput.join('\n'), error: null });
+            }
+        };
+
+        workerRef.current.onmessage = handleMessage;
+
+        workerRef.current.postMessage({ 
+            type: 'runCode', 
+            code, 
+            input, 
+            fileAssets,
+            id: runId
+        });
+    });
+  }, []);
+
+  return { runCode, isLoading, output, clearOutput, terminate };
 }

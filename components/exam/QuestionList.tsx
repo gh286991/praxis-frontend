@@ -7,7 +7,7 @@ import apiClient from '@/lib/apiClient';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-interface QuestionSummary {
+export interface QuestionSummary {
   _id: string;
   title: string;
   generatedBy?: string;
@@ -20,22 +20,31 @@ interface QuestionListProps {
   currentQuestionId?: string;
   onSelectQuestion?: (id: string) => void;
   initialQuestions?: QuestionSummary[];
+  questions?: QuestionSummary[];
   className?: string;
 }
 
-export function QuestionList({ categorySlug, currentQuestionId, initialQuestions, onSelectQuestion, className }: QuestionListProps) {
+export function QuestionList({ categorySlug, currentQuestionId, initialQuestions, questions: externalQuestions, onSelectQuestion, className }: QuestionListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [questions, setQuestions] = useState<QuestionSummary[]>(initialQuestions || []);
-  const [loading, setLoading] = useState(!initialQuestions || initialQuestions.length === 0);
+  const [internalQuestions, setInternalQuestions] = useState<QuestionSummary[]>(initialQuestions || []);
+  const [loading, setLoading] = useState(!externalQuestions && (!initialQuestions || initialQuestions.length === 0));
+
+  const questions = externalQuestions || internalQuestions;
 
   // Parse current QID from URL if not provided prop
   const activeId = currentQuestionId || searchParams.get('q');
 
   useEffect(() => {
-    // If we have initialQuestions, skip fetch unless categorySlug changes (and initialQuestions doesn't match? - simplified for now)
+    // If we have external questions, don't fetch
+    if (externalQuestions) {
+        setLoading(false);
+        return;
+    }
+
+    // If we have initialQuestions, skip fetch unless categorySlug changes 
     if (initialQuestions && initialQuestions.length > 0) {
-        setQuestions(initialQuestions);
+        setInternalQuestions(initialQuestions);
         setLoading(false);
         return;
     }
@@ -44,7 +53,7 @@ export function QuestionList({ categorySlug, currentQuestionId, initialQuestions
       try {
         setLoading(true);
         const res = await apiClient.get<QuestionSummary[]>(`/questions/list/${categorySlug}`);
-        setQuestions(res.data);
+        setInternalQuestions(res.data);
       } catch (error) {
         console.error('Failed to fetch question list:', error);
       } finally {
